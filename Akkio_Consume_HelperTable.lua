@@ -1922,7 +1922,7 @@ BuildBuffStatusUI = function()
           for i = 1, GetNumRaidMembers() do
             local name, _, subgroup, _, _, _, _, _, _, _ = GetRaidRosterInfo(i)
             if name == UnitName("player") and buffdata.canBeAnounced then
-              SendChatMessage("|cffFF6B6BNeed " .. buffName .. " in Group " .. subgroup .. "|r", "RAID")
+              SendChatMessage("|cffFF6B6BNeed " .. buffName .. "|r", "RAID")
             end
           end
         elseif GetNumPartyMembers() > 0 and buffdata.canBeAnounced then
