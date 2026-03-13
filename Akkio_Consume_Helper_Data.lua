@@ -5,11 +5,14 @@
 Akkio_Consume_Helper_Data = {}
 
 Akkio_Consume_Helper_Data.allBuffs = {
+
   { header = true,                               name = "Class Buffs" },
   { name = "Power Word: Fortitude",              icon = "Interface\\Icons\\Spell_Holy_WordFortitude",    buffIcon = "Interface\\Icons\\Spell_Holy_WordFortitude",       raidbuffIcon = "Interface\\Icons\\Spell_Holy_PrayerOfFortitude",         canBeAnounced = true, spellID = 1243},
   { name = "Divine Spirit",                      icon = "Interface\\Icons\\Spell_Holy_DivineSpirit",     buffIcon = "Interface\\Icons\\Spell_Holy_DivineSpirit",        raidbuffIcon = "Interface\\Icons\\Spell_Holy_PrayerofSpirit",            canBeAnounced = true, spellID = 14752},
   { name = "Arcane Intellect",                   icon = "Interface\\Icons\\Spell_Holy_MagicalSentry",    buffIcon = "Interface\\Icons\\Spell_Holy_MagicalSentry",       raidbuffIcon = "Interface\\Icons\\Spell_Holy_ArcaneIntellect",           canBeAnounced = true, spellID = 1459},
   { name = "Mark of the wild",                   icon = "Interface\\Icons\\Spell_Nature_Regeneration",   buffIcon = "Interface\\Icons\\Spell_Nature_Regeneration",                                                                               canBeAnounced = true, spellID = 1126},
+  { name = "Thorns",                             icon = "Interface\\Icons\\Spell_Nature_Thorns",         buffIcon = "Interface\\Icons\\Spell_Nature_Thorns",                                                                                     canBeAnounced = true, spellID = 16877},
+  { name = "Battle Shout",                       icon = "Interface\\Icons\\Ability_Warrior_BattleShout", buffIcon = "Interface\\Icons\\Ability_Warrior_BattleShout",                                                                             canBeAnounced = true, spellID = 25959},
   { name = "Blessing of Salvation",              icon = "Interface\\Icons\\Spell_Holy_SealOfSalvation",  buffIcon = "Interface\\Icons\\Spell_Holy_SealOfSalvation",     raidbuffIcon = "Interface\\Icons\\Spell_Holy_GreaterBlessingofSalvation",canBeAnounced = true, spellID = 1038},
   { name = "Blessing of Might",                  icon = "Interface\\Icons\\Spell_Holy_FistOfJustice",    buffIcon = "Interface\\Icons\\Spell_Holy_FistOfJustice",       raidbuffIcon = "Interface\\Icons\\Spell_Holy_GreaterBlessingofKings",    canBeAnounced = true, spellID = 19740},
   { name = "Blessing of Wisdom",                 icon = "Interface\\Icons\\Spell_Holy_SealOfWisdom",     buffIcon = "Interface\\Icons\\Spell_Holy_SealOfWisdom",        raidbuffIcon = "Interface\\Icons\\Spell_Holy_GreaterBlessingofWisdom",   canBeAnounced = true, spellID = 19742},
@@ -29,10 +32,13 @@ Akkio_Consume_Helper_Data.allBuffs = {
   { name = "Elixir of Superior Defense",         icon = "Interface\\Icons\\Inv_Potion_66",               buffIcon = "Interface\\Icons\\INV_Potion_86",                                                                                           canBeAnounced = false, duration = 3600, itemID = 13445 },
   { name = "Elixir of Shadow Power",             icon = "Interface\\Icons\\Inv_Potion_46",               buffIcon = "Interface\\Icons\\INV_Potion_46",                                                                                           canBeAnounced = false, duration = 3600, itemID = 9264 },
   { name = "Elixir of Greater Firepower",        icon = "Interface\\Icons\\Inv_Potion_60",               buffIcon = "Interface\\Icons\\INV_Potion_60",                                                                                           canBeAnounced = false, duration = 3600, itemID = 21546 },
+  { name = "Elixir of Greater Arcane Power",     icon = "Interface\\Icons\\Inv_Potion_81",               buffIcon = "Interface\\Icons\\Spell_Holy_FlashHeal",                                                                                    canBeAnounced = false, duration = 3600, itemID = 55048 },
+  { name = "Elixir of Greater Frost Power",      icon = "Interface\\Icons\\Inv_Potion_13",               buffIcon = "Interface\\Icons\\INV_Potion_03",                                                                                           canBeAnounced = false, duration = 3600, itemID = 55046 },
   { name = "Elixir of Greater Nature Power",     icon = "Interface\\Icons\\inv_potion_106",              buffIcon = "Interface\\Icons\\inv_potion_106",                                                                                          canBeAnounced = false, duration = 3600, itemID = 50237 },
   { name = "Elixir of Frost Power",              icon = "Interface\\Icons\\INV_Potion_115",              buffIcon = "Interface\\Icons\\INV_Potion_03",                                                                                           canBeAnounced = false, duration = 1800, itemID = 17708 },
   { name = "Elixir of Greater Intellect",        icon = "Interface\\Icons\\INV_Potion_124",              buffIcon = "Interface\\Icons\\inv_potion_124",                                                                                           canBeAnounced = false, duration = 3600, itemID = 9179 },
   { name = "Greater Arcane Elixir",              icon = "Interface\\Icons\\Inv_Potion_25",               buffIcon = "Interface\\Icons\\INV_Potion_25",                                                                                           canBeAnounced = false, duration = 3600, itemID = 13454 },
+  { name = "Major Troll's Blood Potion",         icon = "Interface\\Icons\\Inv_Potion_80",               buffIcon = "Interface\\Icons\\INV_Potion_79",                                                                                           canBeAnounced = false, duration = 3600, itemID = 20004 },
   { name = "Juju Might",                         icon = "Interface\\Icons\\INV_Misc_MonsterScales_07",   buffIcon = "Interface\\Icons\\INV_Misc_MonsterScales_07",                                                                               canBeAnounced = false, duration = 1800, itemID = 12460 },
   { name = "Juju Power",                         icon = "Interface\\Icons\\INV_Misc_MonsterScales_11",   buffIcon = "Interface\\Icons\\INV_Misc_MonsterScales_11",                                                                               canBeAnounced = false, duration = 1800, itemID = 12451 },
   { name = "Juju Flurry",                        icon = "Interface\\Icons\\INV_Misc_MonsterScales_17",   buffIcon = "Interface\\Icons\\INV_Misc_MonsterScales_17",                                                                               canBeAnounced = false, duration = 20, itemID = 12450 },
@@ -48,6 +54,7 @@ Akkio_Consume_Helper_Data.allBuffs = {
   { name = "Gift of Arthas",                     icon = "Interface\\Icons\\Inv_Potion_28",               buffIcon = "Interface\\Icons\\Spell_Shadow_FingerOfDeath",                                                                              canBeAnounced = false, duration = 1800, itemID = 9088 },
   { name = "Winterfall Firewater",               icon = "Interface\\Icons\\INV_Potion_92",               buffIcon = "Interface\\Icons\\INV_Potion_92",                                                                                           canBeAnounced = false, duration = 1200, itemID = 12820 },
   { name = "Spirit of Zanza",                    icon = "Interface\\Icons\\INV_Potion_30",               buffIcon = "Interface\\Icons\\INV_Potion_30",                                                                                           canBeAnounced = false, duration = 7200, itemID = 20079 },
+  { name = "Gizzard Gum",                        icon = "Interface\\Icons\\inv_misc_food_30",            buffIcon = "Interface\\Icons\\Spell_Fire_Incinerate",                                                                                   canBeAnounced = false, duration = 3600, itemID = 8424 },
   { name = "Ground Scorpok Assay",               icon = "Interface\\Icons\\INV_Misc_Dust_07",            buffIcon = "Interface\\Icons\\Spell_Nature_ForceOfNature",                                                                              canBeAnounced = false, duration = 3600, itemID = 8412 },
   { name = "R.O.I.D.S.",                         icon = "Interface\\Icons\\INV_Stone_15",                buffIcon = "Interface\\Icons\\Spell_Nature_Strength",                                                                                   canBeAnounced = false, duration = 3600, itemID = 8410 },
   { name = "Cerebral Cortex Compound",           icon = "Interface\\Icons\\INV_Potion_119",              buffIcon = "Interface\\Icons\\Spell_Nature_Purge",                                                                                      canBeAnounced = false, duration = 3600, itemID = 8423 },
@@ -94,13 +101,69 @@ Akkio_Consume_Helper_Data.allBuffs = {
   { name = "Rumsey Rum Black Label",             icon = "Interface\\Icons\\INV_Drink_04",               buffIcon = "Interface\\Icons\\INV_Drink_04",                                                                                             canBeAnounced = false, duration = 900, itemID = 21151 },
   { name = "Medivh's Merlot",                    icon = "Interface\\Icons\\INV_Drink_Waterskin_05",     buffIcon = "Interface\\Icons\\INV_Drink_04",                                                                                             canBeAnounced = false, duration = 900, itemID = 61174 },
   { name = "Medivh's Merlot Blue",               icon = "Interface\\Icons\\INV_Drink_Waterskin_01",     buffIcon = "Interface\\Icons\\INV_Drink_19",                                                                                             canBeAnounced = false, duration = 900, itemID = 61175 },
+  { name = "Gordok Green Grog",                  icon = "Interface\\Icons\\INV_Drink_03",               buffIcon = "Interface\\Icons\\INV_Drink_03",                                                                                             canBeAnounced = false, duration = 900, itemID = 18269 },
+
+  { header = true,                               name = "Resistance Potions" },
+  { name = "Greater Nature Protection Potion",   icon = "Interface\\Icons\\INV_potion_22",               buffIcon = "Interface\\Icons\\Spell_Nature_SpiritArmor",                                                                                canBeAnounced = false, duration = 3600, itemID = 13458 },
+  { name = "Nature Protection Potion",           icon = "Interface\\Icons\\INV_potion_06",               buffIcon = "Interface\\Icons\\Spell_Nature_SpiritArmor",                                                                                canBeAnounced = false, duration = 3600, itemID = 13458 },
+  { name = "Greater Fire Protection Potion",     icon = "Interface\\Icons\\INV_potion_117",              buffIcon = "Interface\\Icons\\Spell_Fire_FireArmor",                                                                                canBeAnounced = false, duration = 3600, itemID = 13458 },
+  { name = "Fire Protection Potion",             icon = "Interface\\Icons\\INV_potion_16",               buffIcon = "Interface\\Icons\\Spell_Fire_FireArmor",                                                                                canBeAnounced = false, duration = 3600, itemID = 13458 },
+  { name = "Greater Frost Protection Potion",    icon = "Interface\\Icons\\INV_potion_20",               buffIcon = "Interface\\Icons\\Spell_Frost_FrostArmor02",                                                                                canBeAnounced = false, duration = 3600, itemID = 13458 },
+  { name = "Frost Protection Potion",            icon = "Interface\\Icons\\INV_potion_13",               buffIcon = "Interface\\Icons\\Spell_Frost_FrostArmor02",                                                                                canBeAnounced = false, duration = 3600, itemID = 13458 },
+  { name = "Greater Shadow Protection Potion",   icon = "Interface\\Icons\\INV_potion_23",               buffIcon = "Interface\\Icons\\Spell_Shadow_RagingScream",                                                                                canBeAnounced = false, duration = 3600, itemID = 13458 },
+  { name = "Shadow Protection Potion",           icon = "Interface\\Icons\\INV_potion_44",               buffIcon = "Interface\\Icons\\Spell_Shadow_RagingScream",                                                                                canBeAnounced = false, duration = 3600, itemID = 13458 },
+  { name = "Greater Arcane Protection Potion",   icon = "Interface\\Icons\\INV_potion_83",               buffIcon = "Interface\\Icons\\Spell_Holy_PrayerOfHealing02",                                                                                canBeAnounced = false, duration = 3600, itemID = 13458 },
 
   { header = true,                               name = "Combat Potions" },
   { name = "Nordanaar Herbal Tea",               icon = "Interface\\Icons\\inv_drink_waterskin_03",                                                                                                                                              canBeAnounced = false, duration = 0, itemID = 61675 }, -- Instant effect - no buff to track
-  { name = "Potion of Quickness",                icon = "Interface\\Icons\\INV_Potion_08",              buffIcon = "Interface\\Icons\\Spell_Nature_Invisibilty",                                                                                 canBeAnounced = false, duration = 30, itemID = 61181 },
+  { name = "Potion of Quickness",                icon = "Interface\\Icons\\INV_Potion_08",               buffIcon = "Interface\\Icons\\Spell_Nature_Invisibilty",                                                                                 canBeAnounced = false, duration = 30, itemID = 61181 },
   { name = "Mighty Rage Potion",                 icon = "Interface\\Icons\\INV_Potion_125",                                                                                                                                                      canBeAnounced = false, duration = 20, itemID = 13442 }, -- Instant effect - no buff to track
 }
 
+local _, playerClass = UnitClass("player")
+
+local classBuffs = {
+
+  MAGE = {
+    { header = true, name = "Mage Self Buffs" },
+    { name = "Mage Armor",                       icon = "Interface\\Icons\\Spell_MageArmor",             buffIcon = "Interface\\Icons\\Spell_MageArmor",                                                                                         canBeAnounced = false, duration = 1800, spellID = 22783 },
+  },
+
+  PRIEST = {
+    { header = true, name = "Priest Self Buffs" },
+    { name = "Inner Fire",                       icon = "Interface\\Icons\\Spell_Holy_InnerFire",        buffIcon = "Interface\\Icons\\Spell_Holy_InnerFire",                                                                                    canBeAnounced = false, duration = 600, spellID = 10952 },
+  },
+
+  PALADIN = {
+    { header = true, name = "Paladin Self Buffs" },
+    { name = "Righteous Fury",                   icon = "Interface\\Icons\\Spell_Holy_SealOfFury",       buffIcon = "Interface\\Icons\\Spell_Holy_SealOfFury",                                                                                   canBeAnounced = false, spellID = 25780 },
+  },
+
+  SHAMAN = {
+    { header = true, name = "Paladin Self Buffs" },
+    { name = "Lightning Shield",                 icon = "Interface\\Icons\\Spell_Nature_LightningShield",buffIcon = "Interface\\Icons\\Spell_Nature_LightningShield",                                                                            canBeAnounced = false, duration = 600, spellID = 10432 },
+    { name = "Water Shield",                     icon = "Interface\\Icons\\Ability_Shaman_WaterShield",  buffIcon = "Interface\\Icons\\Ability_Shaman_WaterShield",                                                                              canBeAnounced = false, duration = 600, spellID = 51536 },
+  },
+
+  WARLOCK = {
+    { header = true, name = "Paladin Self Buffs" },
+    { name = "Demon Armor",                      icon = "Interface\\Icons\\Spell_Shadow_RagingScream",   buffIcon = "Interface\\Icons\\Spell_Shadow_RagingScream",                                                                               canBeAnounced = false, duration = 1800, spellID = 11735 },
+    
+  },
+}
+
+local addedHeader = false
+
+if classBuffs[playerClass] then
+  for _, buff in ipairs(classBuffs[playerClass]) do
+    if buff.header and addedHeader then
+      -- skip extra headers
+    else
+      table.insert(Akkio_Consume_Helper_Data.allBuffs, buff)
+      addedHeader = addedHeader or buff.header
+    end
+  end
+end
 
 -- Cant find this buff in trutle wow database
  --{ name = "Juice Striped Melon",        icon = "Interface\\Icons\\INV_Misc_Food_09",           buffIcon = "Interface\\Icons\\INV_Misc_Food_09",                                                                                         canBeAnounced = false, duration = 600, itemID = 51721 },
