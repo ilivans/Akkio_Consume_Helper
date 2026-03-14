@@ -474,7 +474,9 @@ local function UpdateBuffStatusOnly()
       local hasBuff = false
       
       -- Check buff status efficiently
-      if data.isWeaponEnchant then
+      if data.checkInventory then
+        hasBuff = findItemInBagAndGetAmount(data.name) > 0
+      elseif data.isWeaponEnchant then
         hasBuff = checkWeaponEnchant(data.slot)
       else
         -- Enhanced buff checking for normal buffs with timestamp tracking
@@ -1854,7 +1856,9 @@ BuildBuffStatusUI = function()
     local hasBuff = false
     
     -- Check if this is a weapon enchant
-    if data.isWeaponEnchant then
+    if data.checkInventory then
+      hasBuff = findItemInBagAndGetAmount(data.name) > 0
+    elseif data.isWeaponEnchant then
       hasBuff = checkWeaponEnchant(data.slot)
     else
       -- Regular buff checking
@@ -1968,7 +1972,9 @@ BuildBuffStatusUI = function()
 
       -- Check current buff status dynamically
       local currentlyHasBuff = false
-      if buffdata.isWeaponEnchant then
+      if buffdata.checkInventory then
+        currentlyHasBuff = findItemInBagAndGetAmount(buffdata.name) > 0
+      elseif buffdata.isWeaponEnchant then
         currentlyHasBuff = checkWeaponEnchant(buffdata.slot)
       else
         -- Check if normal buff is currently active
@@ -2047,7 +2053,9 @@ BuildBuffStatusUI = function()
       
       -- Check current buff status dynamically for tooltip
       local tooltipHasBuff = false
-      if buffdata.isWeaponEnchant then
+      if buffdata.checkInventory then
+        tooltipHasBuff = findItemInBagAndGetAmount(buffdata.name) > 0
+      elseif buffdata.isWeaponEnchant then
         tooltipHasBuff = checkWeaponEnchant(buffdata.slot)
       else
         -- Check if normal buff is currently active
