@@ -446,6 +446,23 @@ local function checkWeaponEnchant(slot)
   return false
 end
 
+local function checkHasBuff(data)
+  if data.checkInventory then
+    return findItemInBagAndGetAmount(data.name) > 0
+  elseif data.isWeaponEnchant then
+    return checkWeaponEnchant(data.slot)
+  else
+    for i = 1, 40 do
+      local buffTexture = UnitBuff("player", i)
+      if not buffTexture then break end
+      if buffTexture == data.buffIcon or buffTexture == data.raidbuffIcon then
+        return true
+      end
+    end
+    return false
+  end
+end
+
 local function UpdateBuffStatusOnly()
   -- Fast update that only changes visual states without rebuilding UI
   if not buffStatusFrame or not buffStatusFrame.children then
@@ -474,10 +491,8 @@ local function UpdateBuffStatusOnly()
       local hasBuff = false
       
       -- Check buff status efficiently
-      if data.checkInventory then
-        hasBuff = findItemInBagAndGetAmount(data.name) > 0
-      elseif data.isWeaponEnchant then
-        hasBuff = checkWeaponEnchant(data.slot)
+      if data.checkInventory or data.isWeaponEnchant then
+        hasBuff = checkHasBuff(data)
       else
         -- Enhanced buff checking for normal buffs with timestamp tracking
         local buffFound = false
@@ -1853,24 +1868,7 @@ BuildBuffStatusUI = function()
       end
       currentCat = dataCat
     end
-    local hasBuff = false
-    
-    -- Check if this is a weapon enchant
-    if data.checkInventory then
-      hasBuff = findItemInBagAndGetAmount(data.name) > 0
-    elseif data.isWeaponEnchant then
-      hasBuff = checkWeaponEnchant(data.slot)
-    else
-      -- Regular buff checking
-      for i = 1, 40 do
-        local buffTexture = UnitBuff("player", i)
-        if not buffTexture then break end
-        if buffTexture == data.buffIcon or buffTexture == data.raidbuffIcon then
-          hasBuff = true
-          break
-        end
-      end
-    end
+    local hasBuff = checkHasBuff(data)
 
     local icon = CreateFrame("Button", nil, buffStatusFrame, "UIPanelButtonTemplate")
     icon:SetWidth(30)
@@ -1971,22 +1969,7 @@ BuildBuffStatusUI = function()
       local buffdata = this.buffdata
 
       -- Check current buff status dynamically
-      local currentlyHasBuff = false
-      if buffdata.checkInventory then
-        currentlyHasBuff = findItemInBagAndGetAmount(buffdata.name) > 0
-      elseif buffdata.isWeaponEnchant then
-        currentlyHasBuff = checkWeaponEnchant(buffdata.slot)
-      else
-        -- Check if normal buff is currently active
-        for i = 1, 40 do
-          local buffTexture = UnitBuff("player", i)
-          if not buffTexture then break end
-          if buffTexture == buffdata.buffIcon or buffTexture == buffdata.raidbuffIcon then
-            currentlyHasBuff = true
-            break
-          end
-        end
-      end
+      local currentlyHasBuff = checkHasBuff(buffdata)
 
       -- Handle weapon enchants differently
       if buffdata.isWeaponEnchant then
@@ -2052,22 +2035,7 @@ BuildBuffStatusUI = function()
       local itemAmount = findItemInBagAndGetAmount(buffdata.name)
       
       -- Check current buff status dynamically for tooltip
-      local tooltipHasBuff = false
-      if buffdata.checkInventory then
-        tooltipHasBuff = findItemInBagAndGetAmount(buffdata.name) > 0
-      elseif buffdata.isWeaponEnchant then
-        tooltipHasBuff = checkWeaponEnchant(buffdata.slot)
-      else
-        -- Check if normal buff is currently active
-        for i = 1, 40 do
-          local buffTexture = UnitBuff("player", i)
-          if not buffTexture then break end
-          if buffTexture == buffdata.buffIcon or buffTexture == buffdata.raidbuffIcon then
-            tooltipHasBuff = true
-            break
-          end
-        end
-      end
+      local tooltipHasBuff = checkHasBuff(buffdata)
       
       -- Main title with status color
       if tooltipHasBuff then
