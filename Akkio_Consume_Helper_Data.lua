@@ -144,13 +144,13 @@ local classBuffs = {
   },
 
   SHAMAN = {
-    { header = true, name = "Paladin Self Buffs" },
+    { header = true, name = "Shaman Self Buffs" },
     { name = "Lightning Shield",                 icon = "Interface\\Icons\\Spell_Nature_LightningShield",buffIcon = "Interface\\Icons\\Spell_Nature_LightningShield",                                                                            canBeAnounced = false, duration = 600, spellID = 10432 },
     { name = "Water Shield",                     icon = "Interface\\Icons\\Ability_Shaman_WaterShield",  buffIcon = "Interface\\Icons\\Ability_Shaman_WaterShield",                                                                              canBeAnounced = false, duration = 600, spellID = 51536 },
   },
 
   WARLOCK = {
-    { header = true, name = "Paladin Self Buffs" },
+    { header = true, name = "Warlock Self Buffs" },
     { name = "Demon Armor",                      icon = "Interface\\Icons\\Spell_Shadow_RagingScream",   buffIcon = "Interface\\Icons\\Spell_Shadow_RagingScream",                                                                               canBeAnounced = false, duration = 1800, spellID = 11735 },
     
   },
