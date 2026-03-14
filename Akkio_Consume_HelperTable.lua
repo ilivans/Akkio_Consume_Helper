@@ -624,24 +624,27 @@ local function applyWeaponEnchant(itemName, slot)
           -- Remove charge information if present (e.g., "Brilliant Wizard Oil (5)" -> "Brilliant Wizard Oil")
           linkItemName = string.gsub(linkItemName, " %(%d+%)$", "")
           if linkItemName == itemName then
-            -- Use the item to put it on cursor
-            UseContainerItem(bag, bagSlot)
-
-            -- Provide clear instructions to the player
             if slot == "mainhand" then
-              if GetInventoryItemTexture("player", 16) then
-                DEFAULT_CHAT_FRAME:AddMessage("|cff00FF00" .. itemName .. " ready!|r |cffFFFF00Click on your MAIN HAND weapon to apply.|r")
-              else
+              if not GetInventoryItemTexture("player", 16) then
                 DEFAULT_CHAT_FRAME:AddMessage("|cffFF6B6BNo weapon equipped in main hand slot.|r")
+                return false
               end
+              UseContainerItem(bag, bagSlot)
+              PickupInventoryItem(16)
+              ReplaceEnchant()
+              ClearCursor()
+              DEFAULT_CHAT_FRAME:AddMessage("|cff00FF00" .. itemName .. " applied to main hand.|r")
             elseif slot == "offhand" then
-              if GetInventoryItemTexture("player", 17) then
-                DEFAULT_CHAT_FRAME:AddMessage("|cff00FF00" .. itemName .. " ready!|r |cffFFFF00Click on your OFF HAND weapon to apply.|r")
-              else
+              if not GetInventoryItemTexture("player", 17) then
                 DEFAULT_CHAT_FRAME:AddMessage("|cffFF6B6BNo weapon equipped in off hand slot.|r")
+                return false
               end
+              UseContainerItem(bag, bagSlot)
+              PickupInventoryItem(17)
+              ReplaceEnchant()
+              ClearCursor()
+              DEFAULT_CHAT_FRAME:AddMessage("|cff00FF00" .. itemName .. " applied to off hand.|r")
             end
-
             return true
           end
         end
