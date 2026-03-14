@@ -125,6 +125,7 @@ Akkio_Consume_Helper_Data.allBuffs = {
   { name = "Nordanaar Herbal Tea",               icon = "Interface\\Icons\\inv_drink_waterskin_03",                                                                                                                                              canBeAnounced = false, duration = 0, itemID = 61675 }, -- Instant effect - no buff to track
   { name = "Potion of Quickness",                icon = "Interface\\Icons\\INV_Potion_08",               buffIcon = "Interface\\Icons\\Spell_Nature_Invisibilty",                                                                                canBeAnounced = false, duration = 30, itemID = 61181 },
   { name = "Mighty Rage Potion",                 icon = "Interface\\Icons\\INV_Potion_125",                                                                                                                                                      canBeAnounced = false, duration = 20, itemID = 13442 }, -- Instant effect - no buff to track
+  { name = "Greater Stoneshield Potion",         icon = "Interface\\Icons\\INV_Potion_69",               buffIcon = "Interface\\Icons\\INV_Potion_69",                                                                                           canBeAnounced = false, duration = 120,  itemID = 13455 },
 }
 
 local _, playerClass = UnitClass("player")
