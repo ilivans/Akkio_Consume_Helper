@@ -431,6 +431,51 @@ local function findItemInBagAndGetAmount(itemName)
   return buffStatusFrame.bagCache[itemName] or 0
 end
 
+local function findItemChargesInBag(itemName)
+  if not getglobal("ItemDataScanTooltip") then
+    CreateFrame("GameTooltip", "ItemDataScanTooltip", UIParent, "GameTooltipTemplate")
+  end
+  local scanTip = getglobal("ItemDataScanTooltip")
+
+  local totalCharges = 0
+  for bag = 0, 4 do
+    for slot = 1, GetContainerNumSlots(bag) do
+      local itemLink = GetContainerItemLink(bag, slot)
+      if itemLink then
+        local _, _, linkItemName = string.find(itemLink, "%[(.-)%]")
+        if linkItemName then
+          local baseName = string.gsub(linkItemName, " %(%d+%)$", "")
+          if baseName == itemName then
+            scanTip:SetOwner(UIParent, "ANCHOR_NONE")
+            scanTip:ClearLines()
+            scanTip:SetBagItem(bag, slot)
+            local charges = nil
+            for i = 1, scanTip:NumLines() do
+              local line = getglobal("ItemDataScanTooltipTextLeft" .. i)
+              if line and line:GetText() then
+                local _, _, chargesStr = string.find(line:GetText(), "(%d+) Charge")
+                if chargesStr then
+                  charges = tonumber(chargesStr)
+                  break
+                end
+              end
+            end
+            if charges then
+              totalCharges = totalCharges + charges
+            else
+              local _, itemCount = GetContainerItemInfo(bag, slot)
+              if itemCount then
+                totalCharges = totalCharges + math.abs(itemCount)
+              end
+            end
+          end
+        end
+      end
+    end
+  end
+  return totalCharges
+end
+
 local function checkWeaponEnchant(slot)
   -- Check if a weapon enchant is present on the specified slot
   -- Returns true if an enchant is detected, false otherwise
@@ -568,7 +613,7 @@ local function UpdateBuffStatusOnly()
       
       -- Update item count if it has an amount label
       if icon.amountLabel then
-        local itemAmount = findItemInBagAndGetAmount(data.name)
+        local itemAmount = data.isWeaponEnchant and findItemChargesInBag(data.name) or findItemInBagAndGetAmount(data.name)
         icon.amountLabel:SetText(itemAmount > 0 and itemAmount or "")
       end
     end
@@ -1893,8 +1938,8 @@ BuildBuffStatusUI = function()
     local iconAmountLabel = icon:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
     iconAmountLabel:SetPoint("BOTTOM", icon, "BOTTOM", 10, 0)
     
-    -- Show item amounts for all items, including weapon enchants
-    local itemAmount = findItemInBagAndGetAmount(data.name)
+    -- Show item amounts for all items; for weapon enchants show remaining charges
+    local itemAmount = data.isWeaponEnchant and findItemChargesInBag(data.name) or findItemInBagAndGetAmount(data.name)
     iconAmountLabel:SetText(itemAmount > 0 and itemAmount or "")
     
     -- Store reference for fast updates
