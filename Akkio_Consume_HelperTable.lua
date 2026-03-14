@@ -328,13 +328,10 @@ end
 local function formatTimeRemaining(seconds)
   if seconds <= 0 then return "" end
   
-  local minutes = math.floor(seconds / 60)
-  local secs = math.floor(seconds - (minutes * 60))
-  
-  if minutes > 0 then
-    return minutes .. "m"
+  if seconds >= 60 then
+    return math.ceil(seconds / 60) .. "m"
   else
-    return secs .. "s"
+    return math.floor(seconds) .. "s"
   end
 end
 
@@ -2212,9 +2209,20 @@ BuildBuffStatusUI = function()
           for buffName, tracker in pairs(buffTracker) do
             local elapsedTime = now - tracker.startTime
             if elapsedTime >= tracker.duration then
-              -- Remove expired entries
-              buffTracker[buffName] = nil
-              Akkio_Consume_Helper_Settings.buffTracker[buffName] = nil
+              -- Only remove if the buff is no longer active
+              local stillActive = false
+              for i = 1, 40 do
+                local tex = UnitBuff("player", i)
+                if not tex then break end
+                if tex == tracker.icon then
+                  stillActive = true
+                  break
+                end
+              end
+              if not stillActive then
+                buffTracker[buffName] = nil
+                Akkio_Consume_Helper_Settings.buffTracker[buffName] = nil
+              end
             end
           end
         end
@@ -2770,9 +2778,20 @@ local function OnLeavingCombat()
           for buffName, tracker in pairs(buffTracker) do
             local elapsedTime = now - tracker.startTime
             if elapsedTime >= tracker.duration then
-              -- Remove expired entries
-              buffTracker[buffName] = nil
-              Akkio_Consume_Helper_Settings.buffTracker[buffName] = nil
+              -- Only remove if the buff is no longer active
+              local stillActive = false
+              for i = 1, 40 do
+                local tex = UnitBuff("player", i)
+                if not tex then break end
+                if tex == tracker.icon then
+                  stillActive = true
+                  break
+                end
+              end
+              if not stillActive then
+                buffTracker[buffName] = nil
+                Akkio_Consume_Helper_Settings.buffTracker[buffName] = nil
+              end
             end
           end
         end
