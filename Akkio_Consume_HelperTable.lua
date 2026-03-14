@@ -40,16 +40,17 @@ local function ResetToDefaults()
       showTooltips = true,
       hoverToShow = false,
       lockFrame = false,
+      splitByCategory = false,
       framePosition = {
         point = "CENTER",
-        relativeTo = "UIParent", 
+        relativeTo = "UIParent",
         relativePoint = "CENTER",
         xOffset = 0,
         yOffset = 32
       }
     }
   }
-  
+
   DEFAULT_CHAT_FRAME:AddMessage("|cff00FF00Settings reset completed.|r Please reconfigure your buff selections.")
 end
 
@@ -136,6 +137,7 @@ if not Akkio_Consume_Helper_Settings.settings then
     showTooltips = true,
     hoverToShow = false,
     lockFrame = false,
+    splitByCategory = false,
     framePosition = {
       point = "CENTER",
       relativeTo = "UIParent", 
@@ -179,6 +181,9 @@ if not Akkio_Consume_Helper_Settings.settings.iconSpacing then
 end
 if Akkio_Consume_Helper_Settings.settings.lockFrame == nil then
   Akkio_Consume_Helper_Settings.settings.lockFrame = false
+end
+if Akkio_Consume_Helper_Settings.settings.splitByCategory == nil then
+  Akkio_Consume_Helper_Settings.settings.splitByCategory = false
 end
 -- Frame position settings (default to CENTER)
 if not Akkio_Consume_Helper_Settings.settings.framePosition then
@@ -827,9 +832,20 @@ BuildSettingsUI = function()
     end
   end)
 
+  -- Split by Category Checkbox
+  local splitByCategoryCheckbox = CreateFrame("CheckButton", "AkkioSplitByCategoryCheckbox", settingsFrame, "UICheckButtonTemplate")
+  splitByCategoryCheckbox:SetWidth(20)
+  splitByCategoryCheckbox:SetHeight(20)
+  splitByCategoryCheckbox:SetPoint("TOPLEFT", iconSpacingEditBox, "BOTTOMLEFT", 0, -20)
+  splitByCategoryCheckbox:SetChecked(Akkio_Consume_Helper_Settings.settings.splitByCategory)
+
+  local splitByCategoryLabel = settingsFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+  splitByCategoryLabel:SetPoint("LEFT", splitByCategoryCheckbox, "RIGHT", 5, 0)
+  splitByCategoryLabel:SetText("Split by category")
+
   -- Combat Settings Section (Left side, bottom)
   local combatLabel = settingsFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-  combatLabel:SetPoint("TOPLEFT", iconSpacingEditBox, "BOTTOMLEFT", 0, -40)
+  combatLabel:SetPoint("TOPLEFT", splitByCategoryCheckbox, "BOTTOMLEFT", 0, -20)
   combatLabel:SetText("Combat Settings:")
 
   -- Pause Updates in Combat Checkbox
@@ -909,7 +925,8 @@ BuildSettingsUI = function()
     local showTooltipsValue = showTooltipsCheckbox:GetChecked() == 1
     local hoverToShowValue = hoverToShowCheckbox:GetChecked() == 1
     local lockFrameValue = lockFrameCheckbox:GetChecked() == 1
-    
+    local splitByCategoryValue = splitByCategoryCheckbox:GetChecked() == 1
+
     -- Validate timer value
     if timerValue < 1 or timerValue > 60 then
       timerValue = 1
@@ -941,7 +958,8 @@ BuildSettingsUI = function()
     Akkio_Consume_Helper_Settings.settings.showTooltips = showTooltipsValue
     Akkio_Consume_Helper_Settings.settings.hoverToShow = hoverToShowValue
     Akkio_Consume_Helper_Settings.settings.lockFrame = lockFrameValue
-    
+    Akkio_Consume_Helper_Settings.settings.splitByCategory = splitByCategoryValue
+
     if buffStatusFrame then
       buffStatusFrame:SetScale(scaleValue)
       
@@ -996,7 +1014,8 @@ BuildSettingsUI = function()
     showTooltipsCheckbox:SetChecked(true)
     hoverToShowCheckbox:SetChecked(false)
     lockFrameCheckbox:SetChecked(false)
-    
+    splitByCategoryCheckbox:SetChecked(false)
+
     -- Reset saved settings to defaults
     Akkio_Consume_Helper_Settings.settings.scale = 1.0
     Akkio_Consume_Helper_Settings.settings.updateTimer = 1
@@ -1007,7 +1026,8 @@ BuildSettingsUI = function()
     Akkio_Consume_Helper_Settings.settings.showTooltips = true
     Akkio_Consume_Helper_Settings.settings.hoverToShow = false
     Akkio_Consume_Helper_Settings.settings.lockFrame = false
-    
+    Akkio_Consume_Helper_Settings.settings.splitByCategory = false
+
     -- Update global variable
     updateTimer = 1
     
@@ -1566,8 +1586,51 @@ BuildBuffStatusUI = function()
     iconSpacing = Akkio_Consume_Helper_Settings.settings.iconSpacing
   end
   
+  local splitByCategory = Akkio_Consume_Helper_Settings.settings.splitByCategory
+
+  -- Build a map from buff reference -> category name
+  local buffCategoryMap = {}
+  local currentCategory = ""
+  for _, buff in ipairs(allBuffs) do
+    if buff.header then
+      currentCategory = buff.name
+    else
+      buffCategoryMap[buff] = currentCategory
+    end
+  end
+
+  -- Count enabled icons per category
+  local categoryIconCount = {}
+  for _, buff in ipairs(enabledBuffsList) do
+    local cat = buffCategoryMap[buff]
+    categoryIconCount[cat] = (categoryIconCount[cat] or 0) + 1
+  end
+
+  -- Simulate layout to get accurate row count
+  -- At a category boundary: fit next category on current line (with 1 gap) if it fits, else new line
   local numIcons = table.getn(enabledBuffsList)
-  local numRows = math.ceil(numIcons / iconsPerRow)
+  local simCol = 0
+  local simRows = 1
+  local simCat = nil
+  for _, buff in ipairs(enabledBuffsList) do
+    local cat = buffCategoryMap[buff]
+    if splitByCategory and simCat and cat ~= simCat and simCol > 0 then
+      local nextCatSize = categoryIconCount[cat] or 0
+      if nextCatSize <= (iconsPerRow - simCol - 1) then
+        simCol = simCol + 1  -- gap slot
+      else
+        simRows = simRows + 1
+        simCol = 0
+      end
+    end
+    simCat = cat
+    simCol = simCol + 1
+    if simCol >= iconsPerRow then
+      simCol = 0
+      simRows = simRows + 1
+    end
+  end
+  local numRows = (numIcons > 0) and simRows or 1
   local frameWidth = math.min(numIcons, iconsPerRow) * iconSpacing + 20 -- spacing per icon + padding
   local frameHeight = numRows * iconSpacing + 40 -- spacing per row + title space + padding
 
@@ -1766,8 +1829,26 @@ BuildBuffStatusUI = function()
   
   local currentRow = 0
   local currentCol = 0
-  
+  local currentCat = nil
+
   for _, data in ipairs(enabledBuffsList) do
+    -- At a category boundary: fit on current line with 1 gap if possible, else new line
+    if splitByCategory then
+      local dataCat = buffCategoryMap[data]
+      if currentCat and dataCat ~= currentCat and currentCol > 0 then
+        local nextCatSize = categoryIconCount[dataCat] or 0
+        if nextCatSize <= (iconsPerRow - currentCol - 1) then
+          currentCol = currentCol + 1
+          xOffset = xOffset + iconSpacing
+        else
+          currentCol = 0
+          currentRow = currentRow + 1
+          xOffset = 10
+          yOffset = yOffset - iconSpacing
+        end
+      end
+      currentCat = dataCat
+    end
     local hasBuff = false
     
     -- Check if this is a weapon enchant
