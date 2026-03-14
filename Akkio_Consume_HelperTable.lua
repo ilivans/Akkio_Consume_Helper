@@ -1610,7 +1610,7 @@ BuildBuffStatusUI = function()
   -- At a category boundary: fit next category on current line (with 1 gap) if it fits, else new line
   local numIcons = table.getn(enabledBuffsList)
   local simCol = 0
-  local simRows = 1
+  local simRow = 0  -- 0-based row index
   local simCat = nil
   for _, buff in ipairs(enabledBuffsList) do
     local cat = buffCategoryMap[buff]
@@ -1618,19 +1618,24 @@ BuildBuffStatusUI = function()
       local nextCatSize = categoryIconCount[cat] or 0
       if nextCatSize <= (iconsPerRow - simCol - 1) then
         simCol = simCol + 1  -- gap slot
+        if simCol >= iconsPerRow then
+          simRow = simRow + 1
+          simCol = 0
+        end
       else
-        simRows = simRows + 1
+        simRow = simRow + 1
         simCol = 0
       end
     end
     simCat = cat
     simCol = simCol + 1
     if simCol >= iconsPerRow then
+      simRow = simRow + 1
       simCol = 0
-      simRows = simRows + 1
     end
   end
-  local numRows = (numIcons > 0) and simRows or 1
+  -- simRow is 0-based; only count the last row if it has icons (simCol > 0)
+  local numRows = (numIcons > 0) and ((simCol > 0) and (simRow + 1) or simRow) or 1
   local frameWidth = math.min(numIcons, iconsPerRow) * iconSpacing + 20 -- spacing per icon + padding
   local frameHeight = numRows * iconSpacing + 40 -- spacing per row + title space + padding
 
