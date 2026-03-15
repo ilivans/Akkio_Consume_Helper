@@ -338,9 +338,13 @@ end
 -- Forward declarations for functions that reference each other
 local BuildBuffSelectionUI
 local BuildSettingsUI
+local BuildMainFrame
 local BuildBuffStatusUI
 local CreateMinimapButton
 local BuildResetConfirmationUI
+
+-- Persistent main frame reference
+local mainFrame = nil
 
 -- ============================================================================
 -- UTILITY FUNCTIONS
@@ -620,6 +624,12 @@ local function UpdateBuffStatusOnly()
   end
 end
 
+-- Expose bag scan functions for use by other modules (e.g. Tracker tab)
+Akkio_Consume_Helper_Tracker = {
+  getAmount  = findItemInBagAndGetAmount,
+  getCharges = findItemChargesInBag,
+}
+
 local function ForceRefreshBuffStatus()
   -- Force an immediate full rebuild and reset cache
   if buffStatusFrame then
@@ -701,86 +711,162 @@ local function applyWeaponEnchant(itemName, slot)
 end
 
 -- ============================================================================
--- UI CREATION FUNCTIONS
+-- MAIN TABBED FRAME
 -- ============================================================================
 
-BuildSettingsUI = function()
-  if settingsFrame then
-    settingsFrame:Show()
+BuildMainFrame = function(defaultTab)
+  defaultTab = defaultTab or 1
+
+  if mainFrame then
+    if mainFrame:IsShown() and defaultTab == mainFrame.activeTab then
+      mainFrame:Hide()
+      return
+    end
+    mainFrame:Show()
+    mainFrame.showTab(defaultTab)
     return
   end
 
-  local max_width = 600
-  local max_height = 800
+  local frameW = 620
+  local frameH = 840
 
-  settingsFrame = CreateFrame("Frame", "AkkioSettingsFrame", UIParent)
-  settingsFrame:SetWidth(max_width)
-  settingsFrame:SetHeight(max_height)
-  settingsFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
-  settingsFrame:SetFrameStrata("DIALOG")
-  settingsFrame:SetFrameLevel(50)
-  settingsFrame:SetMovable(true)
-  settingsFrame:EnableMouse(true)
-  settingsFrame:RegisterForDrag("LeftButton")
-  settingsFrame:SetScript("OnDragStart", function() settingsFrame:StartMoving() end)
-  settingsFrame:SetScript("OnDragStop", function() settingsFrame:StopMovingOrSizing() end)
-  settingsFrame:SetBackdrop({
+  mainFrame = CreateFrame("Frame", "AkkioMainFrame", UIParent)
+  tinsert(UISpecialFrames, "AkkioMainFrame")
+  mainFrame:SetWidth(frameW)
+  mainFrame:SetHeight(frameH)
+  mainFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+  mainFrame:SetFrameStrata("DIALOG")
+  mainFrame:SetFrameLevel(50)
+  mainFrame:SetMovable(true)
+  mainFrame:EnableMouse(true)
+  mainFrame:RegisterForDrag("LeftButton")
+  mainFrame:SetScript("OnDragStart", function() mainFrame:StartMoving() end)
+  mainFrame:SetScript("OnDragStop", function() mainFrame:StopMovingOrSizing() end)
+  mainFrame:SetBackdrop({
     bgFile = "Interface\\Buttons\\WHITE8X8",
     edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-    tile = true,
-    tileSize = 8,
-    edgeSize = 32,
+    tile = true, tileSize = 8, edgeSize = 32,
     insets = { left = 11, right = 12, top = 12, bottom = 11 }
   })
-  settingsFrame:SetBackdropColor(0.1, 0.1, 0.2, 0.95) -- Set background color to dark blue-gray with high opacity
-  settingsFrame:SetBackdropBorderColor(0.8, 0.8, 1, 1) -- Set border color to light blue
-  
-  settingsFrame:Hide() -- Ensure frame is hidden when first created
+  mainFrame:SetBackdropColor(0.1, 0.1, 0.2, 0.95)
+  mainFrame:SetBackdropBorderColor(0.8, 0.8, 1, 1)
 
   -- Title
-  local title = settingsFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-  title:SetPoint("TOP", settingsFrame, "TOP", 0, -16)
-  title:SetText("Akkio's Consume Helper - Settings")
+  local title = mainFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+  title:SetPoint("TOP", mainFrame, "TOP", 0, -16)
+  title:SetText("Akkio's Consume Helper")
 
-  -- Close button (X) in top-right corner
-  local closeXButton = CreateFrame("Button", nil, settingsFrame)
+  -- Close X button
+  local closeXButton = CreateFrame("Button", nil, mainFrame)
   closeXButton:SetWidth(30)
   closeXButton:SetHeight(30)
-  closeXButton:SetPoint("TOPRIGHT", settingsFrame, "TOPRIGHT", -15, -15)
+  closeXButton:SetPoint("TOPRIGHT", mainFrame, "TOPRIGHT", -15, -15)
   closeXButton:SetNormalTexture("Interface\\Buttons\\UI-Panel-MinimizeButton-Up")
   closeXButton:SetPushedTexture("Interface\\Buttons\\UI-Panel-MinimizeButton-Down")
   closeXButton:SetHighlightTexture("Interface\\Buttons\\UI-Panel-MinimizeButton-Highlight")
-  closeXButton:SetScript("OnClick", function()
-    settingsFrame:Hide()
-  end)
-  
-  -- Tooltip for X button
-  closeXButton:SetScript("OnEnter", function()
-    GameTooltip:SetOwner(this, "ANCHOR_LEFT")
-    GameTooltip:AddLine("Close Settings", 1, 1, 1, 1)
-    GameTooltip:AddLine("You can also press Escape", 0.7, 0.7, 0.7, 1)
-    GameTooltip:Show()
-  end)
-  closeXButton:SetScript("OnLeave", function()
-    GameTooltip:Hide()
+  closeXButton:SetScript("OnClick", function() mainFrame:Hide() end)
+
+  -- Tab buttons
+  local tabNames = { "Settings", "Select Buffs", "Shopping List" }
+  local tabButtons = {}
+  local contentPanels = {}
+  local tabBuilt = {}
+  mainFrame.activeTab = 0
+
+  for i, name in ipairs(tabNames) do
+    local btn = CreateFrame("Button", nil, mainFrame, "UIPanelButtonTemplate")
+    btn:SetWidth(140)
+    btn:SetHeight(26)
+    btn:SetText(name)
+    if i == 1 then
+      btn:SetPoint("TOPLEFT", mainFrame, "TOPLEFT", 15, -42)
+    else
+      btn:SetPoint("LEFT", tabButtons[i - 1], "RIGHT", 5, 0)
+    end
+    tabButtons[i] = btn
+
+    local panel = CreateFrame("Frame", nil, mainFrame)
+    panel:SetPoint("TOPLEFT", mainFrame, "TOPLEFT", 10, -75)
+    panel:SetPoint("BOTTOMRIGHT", mainFrame, "BOTTOMRIGHT", -10, 10)
+    panel:Hide()
+    contentPanels[i] = panel
+  end
+
+  -- Tab switching
+  local function showTab(tabIndex)
+    for i = 1, 3 do
+      contentPanels[i]:Hide()
+      tabButtons[i]:Enable()
+    end
+    contentPanels[tabIndex]:Show()
+    tabButtons[tabIndex]:Disable()
+    mainFrame.activeTab = tabIndex
+  end
+
+  tabButtons[1]:SetScript("OnClick", function()
+    if not tabBuilt[1] then
+      BuildSettingsUI(contentPanels[1])
+      tabBuilt[1] = true
+    end
+    showTab(1)
   end)
 
-  -- Button to open Buff Selection UI
-  local buffSelectionButton = CreateFrame("Button", nil, settingsFrame, "UIPanelButtonTemplate")
-  buffSelectionButton:SetWidth(200)
-  buffSelectionButton:SetHeight(30)
-  buffSelectionButton:SetPoint("TOP", title, "BOTTOM", 0, -30)
-  buffSelectionButton:SetText("Configure Tracked Buffs")
-  buffSelectionButton:SetScript("OnClick", function()
-    if not buffSelectFrame then
-      BuildBuffSelectionUI()
+  tabButtons[2]:SetScript("OnClick", function()
+    if not tabBuilt[2] then
+      BuildBuffSelectionUI(contentPanels[2])
+      tabBuilt[2] = true
     end
-    buffSelectFrame:Show()
+    showTab(2)
   end)
+
+  tabButtons[3]:SetScript("OnClick", function()
+    if not tabBuilt[3] then
+      if Akkio_Consume_Helper_Shopping and Akkio_Consume_Helper_Shopping.BuildTrackerUI then
+        Akkio_Consume_Helper_Shopping.BuildTrackerUI(contentPanels[3])
+      end
+      tabBuilt[3] = true
+    end
+    showTab(3)
+  end)
+
+  mainFrame.showTab = showTab
+  mainFrame.tabBuilt = tabBuilt
+  mainFrame.contentPanels = contentPanels
+
+  -- Build and show the default tab
+  if defaultTab == 1 then
+    BuildSettingsUI(contentPanels[1])
+    tabBuilt[1] = true
+  elseif defaultTab == 2 then
+    BuildBuffSelectionUI(contentPanels[2])
+    tabBuilt[2] = true
+  elseif defaultTab == 3 then
+    if Akkio_Consume_Helper_Shopping and Akkio_Consume_Helper_Shopping.BuildTrackerUI then
+      Akkio_Consume_Helper_Shopping.BuildTrackerUI(contentPanels[3])
+    end
+    tabBuilt[3] = true
+  end
+  showTab(defaultTab)
+
+  mainFrame:Show()
+end
+
+-- ============================================================================
+-- UI CREATION FUNCTIONS
+-- ============================================================================
+
+BuildSettingsUI = function(panel)
+  -- When called without a panel, open via the main tabbed frame
+  if not panel then
+    BuildMainFrame(1)
+    return
+  end
+
+  local settingsFrame = panel
 
   -- Scale Slider Label
   local scaleLabel = settingsFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-  scaleLabel:SetPoint("TOPLEFT", settingsFrame, "TOPLEFT", 20, -120)
+  scaleLabel:SetPoint("TOPLEFT", settingsFrame, "TOPLEFT", 20, -15)
   scaleLabel:SetText("Buff Status UI Scale:")
 
   -- Scale Slider
@@ -809,7 +895,7 @@ BuildSettingsUI = function()
 
   -- Layout Settings Section (Left side, under scale slider)
   local layoutLabel = settingsFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-  layoutLabel:SetPoint("TOPLEFT", settingsFrame, "TOPLEFT", 20, -200)
+  layoutLabel:SetPoint("TOPLEFT", settingsFrame, "TOPLEFT", 20, -100)
   layoutLabel:SetText("Layout Settings:")
 
   -- Timer Interval Label
@@ -1109,44 +1195,6 @@ BuildSettingsUI = function()
     DEFAULT_CHAT_FRAME:AddMessage("|cff00FF00Akkio Consume Helper:|r Settings reset to defaults successfully!")
   end)
 
-  -- Shopping List Button
-  local shoppingListButton = CreateFrame("Button", nil, settingsFrame, "UIPanelButtonTemplate")
-  shoppingListButton:SetWidth(120)
-  shoppingListButton:SetHeight(25)
-  shoppingListButton:SetPoint("BOTTOM", settingsFrame, "BOTTOM", 0, 20)
-  shoppingListButton:SetText("Shopping List")
-  shoppingListButton:SetScript("OnClick", function()
-    if Akkio_Consume_Helper_Shopping and Akkio_Consume_Helper_Shopping.BuildUI then
-      Akkio_Consume_Helper_Shopping.BuildUI()
-    else
-      DEFAULT_CHAT_FRAME:AddMessage("|cffFF6B6BAkkio Consume Helper:|r Shopping list module not loaded. Try /actshopping")
-    end
-  end)
-  
-  -- Tooltip for shopping list button
-  shoppingListButton:SetScript("OnEnter", function()
-    GameTooltip:SetOwner(shoppingListButton, "ANCHOR_TOP")
-    GameTooltip:AddLine("Shopping List", 1, 1, 1, 1)
-    GameTooltip:AddLine("View consumables running low", 0.7, 0.7, 0.7, 1)
-    GameTooltip:AddLine("Configure thresholds and alerts", 0.5, 0.5, 0.5, 1)
-    GameTooltip:Show()
-  end)
-  shoppingListButton:SetScript("OnLeave", function()
-    GameTooltip:Hide()
-  end)
-
-  -- Close Button
-  local closeButton = CreateFrame("Button", nil, settingsFrame, "UIPanelButtonTemplate")
-  closeButton:SetWidth(80)
-  closeButton:SetHeight(25)
-  closeButton:SetPoint("BOTTOMRIGHT", settingsFrame, "BOTTOMRIGHT", -20, 20)
-  closeButton:SetText("Close")
-  closeButton:SetScript("OnClick", function()
-    settingsFrame:Hide()
-  end)
-  
-  -- Show the settings frame after it's fully created
-  settingsFrame:Show()
 end
 
 -- ============================================================================
@@ -1274,7 +1322,13 @@ end
 -- UI CREATION FUNCTIONS
 -- ============================================================================
 
-BuildBuffSelectionUI = function()
+BuildBuffSelectionUI = function(panel)
+  -- When called without a panel, open via the main tabbed frame
+  if not panel then
+    BuildMainFrame(2)
+    return
+  end
+
   local tempTable = {}
 
   wipeTable(tempTable)
@@ -1283,63 +1337,31 @@ BuildBuffSelectionUI = function()
     -- Handle both old format (just name) and new format (name_slot for weapon enchants)
     local actualName = name
     local slot = nil
-    
+
     -- Check if this is a weapon enchant with slot info
     if string.find(name, "_mainhand") then
       actualName = string.gsub(name, "_mainhand", "")
       slot = "mainhand"
     elseif string.find(name, "_offhand") then
-      actualName = string.gsub(name, "_offhand", "")  
+      actualName = string.gsub(name, "_offhand", "")
       slot = "offhand"
     end
-    
+
     if slot then
-      -- Create unique identifier for weapon enchants in tempTable
       tempTable[name] = true
     else
-      -- Regular buffs use just the name
       tempTable[actualName] = true
     end
   end
 
-  local max_width = 500
-  local max_height = 680
   local checkboxHeight = 30
 
-  buffSelectFrame = CreateFrame("Frame", "BuffToggleFrame", UIParent)
-  buffSelectFrame:SetWidth(max_width)
-  buffSelectFrame:SetHeight(max_height)
-  
-  -- Position to the right of settings frame if it exists and is shown
-  if settingsFrame and settingsFrame:IsShown() then
-    buffSelectFrame:SetPoint("TOPLEFT", settingsFrame, "TOPRIGHT", 10, 0)
-  else
-    buffSelectFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 32)
-  end
-  
-  buffSelectFrame:SetFrameStrata("DIALOG")
-  buffSelectFrame:SetFrameLevel(100)
-  buffSelectFrame:SetMovable(true)
-  buffSelectFrame:EnableMouse(true)
-  buffSelectFrame:RegisterForDrag("LeftButton")
-  buffSelectFrame:SetScript("OnDragStart", function() buffSelectFrame:StartMoving() end)
-  buffSelectFrame:SetScript("OnDragStop", function() buffSelectFrame:StopMovingOrSizing() end)
-  buffSelectFrame:SetBackdrop({
-    bgFile = "Interface\\Buttons\\WHITE8X8",
-    edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-    tile = true,
-    tileSize = 8,
-    edgeSize = 32,
-    insets = { left = 11, right = 12, top = 12, bottom = 11 }
-  })
-  buffSelectFrame:SetBackdropColor(0.05, 0.1, 0.15, 0.95) -- Set background color to dark blue-black with high opacity
-  buffSelectFrame:SetBackdropBorderColor(0.7, 0.8, 1, 1) -- Set border color to light blue
+  local buffSelectFrame = panel
 
-  -- ScrollFrame with ShaguTweaks compatibility
+  -- ScrollFrame
   buffSelectFrame.scrollframe = CreateFrame("ScrollFrame", "AkkioBuffScrollFrame", buffSelectFrame)
-  buffSelectFrame.scrollframe:SetWidth(max_width - 50)
-  buffSelectFrame.scrollframe:SetHeight(max_height - 60)
-  buffSelectFrame.scrollframe:SetPoint("TOP", buffSelectFrame, "TOP", 0, -40)
+  buffSelectFrame.scrollframe:SetPoint("TOPLEFT", buffSelectFrame, "TOPLEFT", 0, -5)
+  buffSelectFrame.scrollframe:SetPoint("BOTTOMRIGHT", buffSelectFrame, "BOTTOMRIGHT", -22, 45)
 
   -- Create scroll bar manually for better compatibility
   buffSelectFrame.scrollbar = CreateFrame("Slider", "AkkioBuffScrollBar", buffSelectFrame.scrollframe, "UIPanelScrollBarTemplate")
@@ -1377,11 +1399,6 @@ BuildBuffSelectionUI = function()
   buffSelectFrame.scrollframe:SetScrollChild(buffSelectFrame.content)
 
   local content = buffSelectFrame.content
-
-  -- Title
-  buffSelectFrame.title = buffSelectFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-  buffSelectFrame.title:SetPoint("TOP", buffSelectFrame, "TOP", 0, -16)
-  buffSelectFrame.title:SetText("Select Buffs & Consumables to Track")
 
   local currentYOffset = 0
 
@@ -1570,7 +1587,7 @@ BuildBuffSelectionUI = function()
   closeButton:SetWidth(120)
   closeButton:SetHeight(30)
   closeButton:SetPoint("BOTTOMRIGHT", buffSelectFrame, "BOTTOMRIGHT", -30, 10)
-  closeButton:SetText("Save and Close")
+  closeButton:SetText("Save")
   closeButton:SetScript("OnClick", function()
     Akkio_Consume_Helper_Settings.enabledBuffs = {}
     wipeTable(Akkio_Consume_Helper_Settings.enabledBuffs)
@@ -1589,8 +1606,6 @@ BuildBuffSelectionUI = function()
     end
 
     DEFAULT_CHAT_FRAME:AddMessage("|cff00FF00Akkio Consume Helper:|r Buff selections saved successfully!")
-    buffSelectFrame:Hide()
-    
     -- Force immediate refresh of buff status UI to show new selections
     ForceRefreshBuffStatus()
   end)
@@ -2372,15 +2387,7 @@ CreateMinimapButton = function()
   UpdateMinimapButtonPosition()
 
   miniMapBtn:SetScript("OnClick", function()
-    if not settingsFrame then
-      BuildSettingsUI()
-    end
-
-    if settingsFrame:IsShown() then
-      settingsFrame:Hide()
-    else
-      settingsFrame:Show()
-    end
+    BuildMainFrame(1)
   end)
 
   -- Tooltip for the minimap button
@@ -2404,15 +2411,12 @@ end
 
 SLASH_AKKIOCONSUME1 = "/act"
 SlashCmdList["AKKIOCONSUME"] = function()
-  if not buffSelectFrame then
-    BuildBuffSelectionUI()
-  end
-  buffSelectFrame:Show()
+  BuildMainFrame(2)
 end
 
 SLASH_AKKIOSETTINGS1 = "/actsettings"
 SlashCmdList["AKKIOSETTINGS"] = function()
-  BuildSettingsUI()
+  BuildMainFrame(1)
 end
 
 SLASH_AKKIOBUFFSTATUS1 = "/actbuffstatus"
@@ -2650,7 +2654,7 @@ CreateWelcomeWindow = function()
   settingsButton:SetPoint("TOP", welcome, "TOP", 0, -180)
   settingsButton:SetText("Open Settings")
   settingsButton:SetScript("OnClick", function()
-    BuildSettingsUI()
+    BuildMainFrame(1)
     welcome:Hide()
   end)
   
@@ -2880,16 +2884,142 @@ inCombatFrame:SetScript("OnEvent", function()
   end
 end)
 
+-- ============================================================================
+-- BANK & MAIL SCANNING FOR TRACKER
+-- ============================================================================
+
+local isBankOpen = false
+local isMailOpen = false
+
+local function scanBankForTracker()
+  if not isBankOpen then return end
+  local store = Akkio_Consume_Helper_Settings.tracker
+  if not store then return end
+  store.bank = {}
+
+  if not getglobal("ItemDataScanTooltip") then
+    CreateFrame("GameTooltip", "ItemDataScanTooltip", UIParent, "GameTooltipTemplate")
+  end
+  local scanTip = getglobal("ItemDataScanTooltip")
+
+  for bag = -1, 10 do
+    if bag == -1 or (bag >= 5 and bag <= 10) then
+      local numSlots = GetContainerNumSlots(bag)
+      if numSlots then
+        for slot = 1, numSlots do
+          local itemLink = GetContainerItemLink(bag, slot)
+          if itemLink then
+            local _, _, linkName = string.find(itemLink, "%[(.-)%]")
+            if linkName then
+              local baseName = string.gsub(linkName, " %(%d+%)$", "")
+              -- Use tooltip scanning to get charges for charged items (oils etc.)
+              scanTip:SetOwner(UIParent, "ANCHOR_NONE")
+              scanTip:ClearLines()
+              scanTip:SetBagItem(bag, slot)
+              local charges = nil
+              for line = 1, scanTip:NumLines() do
+                local lineFrame = getglobal("ItemDataScanTooltipTextLeft" .. line)
+                if lineFrame and lineFrame:GetText() then
+                  local _, _, chargesStr = string.find(lineFrame:GetText(), "(%d+) Charge")
+                  if chargesStr then
+                    charges = tonumber(chargesStr)
+                    break
+                  end
+                end
+              end
+              if not charges then
+                local _, itemCount = GetContainerItemInfo(bag, slot)
+                if itemCount then charges = math.abs(itemCount) end
+              end
+              if charges and charges > 0 then
+                store.bank[baseName] = (store.bank[baseName] or 0) + charges
+              end
+            end
+          end
+        end
+      end
+    end
+  end
+  if Akkio_Consume_Helper_Shopping and Akkio_Consume_Helper_Shopping.RefreshTracker then
+    Akkio_Consume_Helper_Shopping.RefreshTracker()
+  end
+end
+
+local function scanMailForTracker()
+  if not isMailOpen then return end
+  local store = Akkio_Consume_Helper_Settings.tracker
+  if not store then return end
+  store.mail = {}
+
+  if not getglobal("ItemDataScanTooltip") then
+    CreateFrame("GameTooltip", "ItemDataScanTooltip", UIParent, "GameTooltipTemplate")
+  end
+  local scanTip = getglobal("ItemDataScanTooltip")
+
+  local numItems = GetInboxNumItems()
+  if numItems and numItems > 0 then
+    for i = 1, numItems do
+      local itemName, _, itemCount = GetInboxItem(i)
+      if itemName and itemCount and itemCount > 0 then
+        -- Use tooltip scanning to get charges for charged items (oils etc.)
+        scanTip:SetOwner(UIParent, "ANCHOR_NONE")
+        scanTip:ClearLines()
+        scanTip:SetInboxItem(i)
+        local charges = nil
+        for line = 1, scanTip:NumLines() do
+          local lineFrame = getglobal("ItemDataScanTooltipTextLeft" .. line)
+          if lineFrame and lineFrame:GetText() then
+            local _, _, chargesStr = string.find(lineFrame:GetText(), "(%d+) Charge")
+            if chargesStr then
+              charges = tonumber(chargesStr)
+              break
+            end
+          end
+        end
+        store.mail[itemName] = (store.mail[itemName] or 0) + (charges or itemCount)
+      end
+    end
+  end
+  if Akkio_Consume_Helper_Shopping and Akkio_Consume_Helper_Shopping.RefreshTracker then
+    Akkio_Consume_Helper_Shopping.RefreshTracker()
+  end
+end
+
+local bankDelayFrame = CreateFrame("Frame")
+bankDelayFrame:Hide()
+local bankDelayStart = 0
+bankDelayFrame:SetScript("OnUpdate", function()
+  if GetTime() - bankDelayStart >= 0.5 then
+    bankDelayFrame:Hide()
+    scanBankForTracker()
+  end
+end)
+
+local mailDelayFrame = CreateFrame("Frame")
+mailDelayFrame:Hide()
+local mailDelayStart = 0
+mailDelayFrame:SetScript("OnUpdate", function()
+  if GetTime() - mailDelayStart >= 0.5 then
+    mailDelayFrame:Hide()
+    scanMailForTracker()
+  end
+end)
+
 -- Ensure buff tracker data gets saved
 local saveFrame = CreateFrame("Frame")
 saveFrame:RegisterEvent("PLAYER_LOGOUT")
 saveFrame:RegisterEvent("ADDON_LOADED")
+saveFrame:RegisterEvent("BANKFRAME_OPENED")
+saveFrame:RegisterEvent("BANKFRAME_CLOSED")
+saveFrame:RegisterEvent("MAIL_SHOW")
+saveFrame:RegisterEvent("MAIL_CLOSED")
+saveFrame:RegisterEvent("MAIL_INBOX_UPDATE")
 saveFrame:SetScript("OnEvent", function()
   if event == "ADDON_LOADED" and arg1 == "Akkio_Consume_Helper" then
     -- Reinitialize buffTracker reference after addon loads
     initializeBuffTracker()
     buffTracker = Akkio_Consume_Helper_Settings.buffTracker
-    
+
     -- Initialize shopping list module if available
     if Akkio_Consume_Helper_Shopping and Akkio_Consume_Helper_Shopping.Initialize then
       Akkio_Consume_Helper_Shopping.Initialize()
@@ -2900,6 +3030,23 @@ saveFrame:SetScript("OnEvent", function()
       for buffName, data in pairs(buffTracker) do
         Akkio_Consume_Helper_Settings.buffTracker[buffName] = data
       end
+    end
+  elseif event == "BANKFRAME_OPENED" then
+    isBankOpen = true
+    bankDelayStart = GetTime()
+    bankDelayFrame:Show()
+  elseif event == "BANKFRAME_CLOSED" then
+    isBankOpen = false
+  elseif event == "MAIL_SHOW" then
+    isMailOpen = true
+    mailDelayStart = GetTime()
+    mailDelayFrame:Show()
+  elseif event == "MAIL_CLOSED" then
+    isMailOpen = false
+  elseif event == "MAIL_INBOX_UPDATE" then
+    if isMailOpen then
+      mailDelayStart = GetTime()
+      mailDelayFrame:Show()
     end
   end
 end)
