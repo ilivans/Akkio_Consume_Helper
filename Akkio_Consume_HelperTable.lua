@@ -2108,14 +2108,35 @@ BuildBuffStatusUI = function()
         DEFAULT_CHAT_FRAME:AddMessage("|cff98FB98You already have " .. buffName .. " buff active.|r")
       else
         if GetNumRaidMembers() > 0 then
+          local playerGroup = nil
           for i = 1, GetNumRaidMembers() do
-            local name, _, subgroup, _, _, _, _, _, _, _ = GetRaidRosterInfo(i)
-            if name == UnitName("player") and buffdata.canBeAnounced then
-              SendChatMessage("|cffFF6B6BNeed " .. buffName .. "|r", "RAID")
+            local name, _, subgroup = GetRaidRosterInfo(i)
+            if name == UnitName("player") then
+              playerGroup = subgroup
+              break
             end
           end
+          if playerGroup and buffdata.canBeAnounced then
+            local msg
+            if buffdata.isPaladinBuff then
+              local playerClass = UnitClass("player")
+              msg = "|cffFF6B6Bneed " .. buffName .. " [" .. playerClass .. "]|r"
+            elseif buffdata.isGroupBuff then
+              msg = "|cffFF6B6Bneed " .. buffName .. " [group " .. playerGroup .. "]|r"
+            else
+              msg = "|cffFF6B6Bneed " .. buffName .. "|r"
+            end
+            SendChatMessage(msg, "RAID")
+          end
         elseif GetNumPartyMembers() > 0 and buffdata.canBeAnounced then
-          SendChatMessage("|cffFF6B6BNeed " .. buffName .. "|r", "PARTY")
+          local msg
+          if buffdata.isPaladinBuff then
+            local playerClass = UnitClass("player")
+            msg = "|cffFF6B6Bneed " .. buffName .. " [" .. playerClass .. "]|r"
+          else
+            msg = "|cffFF6B6Bneed " .. buffName .. "|r"
+          end
+          SendChatMessage(msg, "PARTY")
         end
         --DEFAULT_CHAT_FRAME:AddMessage("I need " .. buffName)
         if buffdata.canBeAnounced == false and findItemInBagAndGetAmount(buffdata.name) > 0 then
