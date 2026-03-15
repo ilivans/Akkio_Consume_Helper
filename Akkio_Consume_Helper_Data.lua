@@ -7,6 +7,8 @@ Akkio_Consume_Helper_Data = {}
 Akkio_Consume_Helper_Data.allBuffs = {
 
   { header = true,                               name = "Class Buffs" },
+  { name = "Holy Champion",                      icon = "Interface\\Icons\\Spell_Holy_ProclaimChampion_02", buffIcon = "Interface\\Icons\\Spell_Holy_ProclaimChampion_02",                                                                       canBeAnounced = true, spellID = 45568},
+  { name = "Empower Champion",                   icon = "Interface\\Icons\\Spell_Holy_EmpowerChampion",  buffIcon = "Interface\\Icons\\Spell_Holy_EmpowerChampion",                                                                              canBeAnounced = true, spellID = 45565},
   { name = "Power Word: Fortitude",              icon = "Interface\\Icons\\Spell_Holy_WordFortitude",    buffIcon = "Interface\\Icons\\Spell_Holy_WordFortitude",       raidbuffIcon = "Interface\\Icons\\Spell_Holy_PrayerOfFortitude",         canBeAnounced = true, spellID = 1243},
   { name = "Divine Spirit",                      icon = "Interface\\Icons\\Spell_Holy_DivineSpirit",     buffIcon = "Interface\\Icons\\Spell_Holy_DivineSpirit",        raidbuffIcon = "Interface\\Icons\\Spell_Holy_PrayerofSpirit",            canBeAnounced = true, spellID = 14752},
   { name = "Arcane Intellect",                   icon = "Interface\\Icons\\Spell_Holy_MagicalSentry",    buffIcon = "Interface\\Icons\\Spell_Holy_MagicalSentry",       raidbuffIcon = "Interface\\Icons\\Spell_Holy_ArcaneIntellect",           canBeAnounced = true, spellID = 1459},
