@@ -1661,11 +1661,29 @@ BuildBuffStatusUI = function()
     end
   end
 
-  -- Count enabled icons per category
+  -- Meta-category groupings for split-by-category layout
+  local metaCategories = {
+    ["Class Buffs"]                    = "Buffs",
+    ["Flasks"]                         = "Elixirs",
+    ["Elixirs & Concoctions"]          = "Elixirs",
+    ["Juju"]                           = "Elixirs",
+    ["Special Potions & Consumables"]  = "Elixirs",
+    ["Weapon Enchants"]                = "Elixirs",
+    ["Food & Drinks"]                  = "Food",
+    ["Alcoholic Beverages"]            = "Food",
+    ["Resistance Potions"]             = "Combat",
+    ["Combat Potions"]                 = "Combat",
+  }
+  local function getMetaCat(buff)
+    local cat = buffCategoryMap[buff]
+    return metaCategories[cat] or cat
+  end
+
+  -- Count enabled icons per meta-category
   local categoryIconCount = {}
   for _, buff in ipairs(enabledBuffsList) do
-    local cat = buffCategoryMap[buff]
-    categoryIconCount[cat] = (categoryIconCount[cat] or 0) + 1
+    local metaCat = getMetaCat(buff)
+    categoryIconCount[metaCat] = (categoryIconCount[metaCat] or 0) + 1
   end
 
   -- Simulate layout to get accurate row count
@@ -1675,7 +1693,7 @@ BuildBuffStatusUI = function()
   local simRow = 0  -- 0-based row index
   local simCat = nil
   for _, buff in ipairs(enabledBuffsList) do
-    local cat = buffCategoryMap[buff]
+    local cat = getMetaCat(buff)
     if splitByCategory and simCat and cat ~= simCat and simCol > 0 then
       local nextCatSize = categoryIconCount[cat] or 0
       if nextCatSize <= (iconsPerRow - simCol - 1) then
@@ -1901,7 +1919,7 @@ BuildBuffStatusUI = function()
   for _, data in ipairs(enabledBuffsList) do
     -- At a category boundary: fit on current line with 1 gap if possible, else new line
     if splitByCategory then
-      local dataCat = buffCategoryMap[data]
+      local dataCat = getMetaCat(data)
       if currentCat and dataCat ~= currentCat and currentCol > 0 then
         local nextCatSize = categoryIconCount[dataCat] or 0
         if nextCatSize <= (iconsPerRow - currentCol - 1) then
