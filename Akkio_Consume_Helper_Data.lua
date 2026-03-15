@@ -49,11 +49,6 @@ Akkio_Consume_Helper_Data.allBuffs = {
   { name = "Concoction of the Arcane Giant",     icon = "Interface\\Icons\\inv_yellow_purple_elixir_2",  buffIcon = "Interface\\Icons\\inv_yellow_purple_elixir_2",                                                                              canBeAnounced = false, duration = 3600, itemID = 47412 },
   { name = "Concoction of the Dreamwater",       icon = "Interface\\Icons\\inv_green_pink_elixir_1",     buffIcon = "Interface\\Icons\\inv_green_pink_elixir_1",                                                                                 canBeAnounced = false, duration = 1200, itemID = 47414 },
 
-  { header = true,                               name = "Juju" },
-  { name = "Juju Might",                         icon = "Interface\\Icons\\INV_Misc_MonsterScales_07",   buffIcon = "Interface\\Icons\\INV_Misc_MonsterScales_07",                                                                               canBeAnounced = false, duration = 1800, itemID = 12460 },
-  { name = "Juju Power",                         icon = "Interface\\Icons\\INV_Misc_MonsterScales_11",   buffIcon = "Interface\\Icons\\INV_Misc_MonsterScales_11",                                                                               canBeAnounced = false, duration = 1800, itemID = 12451 },
-  { name = "Juju Flurry",                        icon = "Interface\\Icons\\INV_Misc_MonsterScales_17",   buffIcon = "Interface\\Icons\\INV_Misc_MonsterScales_17",                                                                               canBeAnounced = false, duration = 20, itemID = 12450 },
-
   { header = true,                               name = "Special Potions & Consumables" },
   { name = "Spirit of Zanza",                    icon = "Interface\\Icons\\INV_Potion_30",               buffIcon = "Interface\\Icons\\INV_Potion_30",                                                                                           canBeAnounced = false, duration = 7200, itemID = 20079 },
   { name = "Mageblood Potion",                   icon = "Interface\\Icons\\Inv_Potion_45",               buffIcon = "Interface\\Icons\\INV_Potion_45",                                                                                           canBeAnounced = false, duration = 3600, itemID = 20007 },
@@ -88,6 +83,11 @@ Akkio_Consume_Helper_Data.allBuffs = {
   { name = "Frost Oil",                          icon = "Interface\\Icons\\INV_potion_130",              buffIcon = "weapon_enchant_oh", raidbuffIcon = "weapon_enchant_oh",                                                                     canBeAnounced = false, isWeaponEnchant = true, slot = "offhand", itemID = 3829 },
   { name = "Lesser Mana Oil",                    icon = "Interface\\Icons\\INV_Potion_99",               buffIcon = "weapon_enchant_oh", raidbuffIcon = "weapon_enchant_mh",                                                                     canBeAnounced = false, isWeaponEnchant = true, slot = "mainhand", itemID = 20747 },
   { name = "Lesser Mana Oil",                    icon = "Interface\\Icons\\INV_Potion_99",               buffIcon = "weapon_enchant_oh", raidbuffIcon = "weapon_enchant_oh",                                                                     canBeAnounced = false, isWeaponEnchant = true, slot = "offhand", itemID = 20747 },
+
+  { header = true,                               name = "Juju" },
+  { name = "Juju Might",                         icon = "Interface\\Icons\\INV_Misc_MonsterScales_07",   buffIcon = "Interface\\Icons\\INV_Misc_MonsterScales_07",                                                                               canBeAnounced = false, duration = 1800, itemID = 12460 },
+  { name = "Juju Power",                         icon = "Interface\\Icons\\INV_Misc_MonsterScales_11",   buffIcon = "Interface\\Icons\\INV_Misc_MonsterScales_11",                                                                               canBeAnounced = false, duration = 1800, itemID = 12451 },
+  { name = "Juju Flurry",                        icon = "Interface\\Icons\\INV_Misc_MonsterScales_17",   buffIcon = "Interface\\Icons\\INV_Misc_MonsterScales_17",                                                                               canBeAnounced = false, duration = 20, itemID = 12450 },
 
   { header = true,                               name = "Food & Drinks" },
   { name = "Smoked Desert Dumplings",            icon = "Interface\\Icons\\Inv_Misc_Food_64",            buffIcon = "Interface\\Icons\\Spell_Misc_Food",                                                                                         canBeAnounced = false, duration = 900, itemID = 20452 },
