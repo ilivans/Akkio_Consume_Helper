@@ -29,6 +29,7 @@ local function ResetToDefaults()
   Akkio_Consume_Helper_Settings = {
     version = ADDON_VERSION,
     enabledBuffs = {},
+    onlyForShopping = {},
     settings = {
       scale = 1.0,
       updateTimer = 1,
@@ -195,6 +196,10 @@ if not Akkio_Consume_Helper_Settings.settings.framePosition then
     yOffset = 32
   }
 end
+if not Akkio_Consume_Helper_Settings.onlyForShopping then
+  Akkio_Consume_Helper_Settings.onlyForShopping = {}
+end
+
 -- ============================================================================
 -- GLOBAL VARIABLES
 -- ============================================================================
@@ -339,6 +344,7 @@ end
 local BuildBuffSelectionUI
 local BuildSettingsUI
 local BuildMainFrame
+local lastActiveTab = 1
 local BuildBuffStatusUI
 local CreateMinimapButton
 local BuildResetConfirmationUI
@@ -643,6 +649,9 @@ local function ForceRefreshBuffStatus()
     
     BuildBuffStatusUI()
   end
+  if Akkio_Consume_Helper_Shopping and Akkio_Consume_Helper_Shopping.RefreshTracker then
+    Akkio_Consume_Helper_Shopping.RefreshTracker()
+  end
 end
 
 local function findAndUseItemByName(itemName)
@@ -715,7 +724,7 @@ end
 -- ============================================================================
 
 BuildMainFrame = function(defaultTab)
-  defaultTab = defaultTab or 1
+  defaultTab = defaultTab or lastActiveTab
 
   if mainFrame then
     if mainFrame:IsShown() and defaultTab == mainFrame.activeTab then
@@ -801,6 +810,7 @@ BuildMainFrame = function(defaultTab)
     contentPanels[tabIndex]:Show()
     tabButtons[tabIndex]:Disable()
     mainFrame.activeTab = tabIndex
+    lastActiveTab = tabIndex
   end
 
   tabButtons[1]:SetScript("OnClick", function()
@@ -1401,9 +1411,11 @@ BuildBuffSelectionUI = function(panel)
   local content = buffSelectFrame.content
 
   local currentYOffset = 0
+  local currentCat = nil
 
   for i, buff in ipairs(allBuffs) do
     if buff.header then
+      currentCat = buff.name
       local headerLabel = content:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
       headerLabel:SetPoint("TOPLEFT", content, "TOPLEFT", 10, -18 - currentYOffset)
       headerLabel:SetText(buff.name)
@@ -1564,6 +1576,38 @@ BuildBuffSelectionUI = function(panel)
         label:SetText(actualBuffName)
       end
 
+      -- "Only for shopping" inline checkbox — shown for Combat Potions and Utility
+      if currentCat == "Combat Potions" or currentCat == "Utility" then
+        local capturedCheckName = checkName
+        -- Ensure table exists (may be nil if settings were reset)
+        if not Akkio_Consume_Helper_Settings.onlyForShopping then
+          Akkio_Consume_Helper_Settings.onlyForShopping = {}
+        end
+        -- Default to true (only for shopping) if not yet set
+        if Akkio_Consume_Helper_Settings.onlyForShopping[capturedCheckName] == nil then
+          Akkio_Consume_Helper_Settings.onlyForShopping[capturedCheckName] = true
+        end
+
+        local shopCb = CreateFrame("CheckButton", nil, content, "UICheckButtonTemplate")
+        shopCb:SetWidth(20)
+        shopCb:SetHeight(20)
+        shopCb:SetPoint("LEFT", cb, "LEFT", 320, 0)
+        shopCb:SetChecked(Akkio_Consume_Helper_Settings.onlyForShopping[capturedCheckName])
+
+        local shopLabel = content:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        shopLabel:SetPoint("LEFT", shopCb, "RIGHT", 2, 0)
+        shopLabel:SetText("Only shopping")
+        shopLabel:SetTextColor(0.7, 0.7, 0.7)
+
+        shopCb:SetScript("OnClick", function()
+          if not Akkio_Consume_Helper_Settings.onlyForShopping then
+            Akkio_Consume_Helper_Settings.onlyForShopping = {}
+          end
+          Akkio_Consume_Helper_Settings.onlyForShopping[capturedCheckName] = (this:GetChecked() == 1)
+          ForceRefreshBuffStatus()
+        end)
+      end
+
       cb:SetScript("OnClick", function()
         local buffName = label:GetText()
         
@@ -1578,38 +1622,25 @@ BuildBuffSelectionUI = function(panel)
         else
           tempTable[uniqueName] = nil
         end
+        -- Rebuild enabledBuffs in allBuffs order so position is always consistent
+        Akkio_Consume_Helper_Settings.enabledBuffs = {}
+        for _, buff in ipairs(allBuffs) do
+          if not buff.header then
+            local checkName = buff.name
+            if buff.isWeaponEnchant then
+              checkName = buff.name .. "_" .. buff.slot
+            end
+            if tempTable[checkName] then
+              table.insert(Akkio_Consume_Helper_Settings.enabledBuffs, checkName)
+            end
+          end
+        end
+        ForceRefreshBuffStatus()
       end)
       currentYOffset = currentYOffset + checkboxHeight
     end
   end
   
-  local closeButton = CreateFrame("Button", nil, buffSelectFrame, "UIPanelButtonTemplate")
-  closeButton:SetWidth(120)
-  closeButton:SetHeight(30)
-  closeButton:SetPoint("BOTTOMRIGHT", buffSelectFrame, "BOTTOMRIGHT", -30, 10)
-  closeButton:SetText("Save")
-  closeButton:SetScript("OnClick", function()
-    Akkio_Consume_Helper_Settings.enabledBuffs = {}
-    wipeTable(Akkio_Consume_Helper_Settings.enabledBuffs)
-
-    for i, buff in ipairs(allBuffs) do
-      if not buff.header then
-        local checkName = buff.name
-        if buff.isWeaponEnchant then
-          checkName = buff.name .. "_" .. buff.slot
-        end
-        
-        if tempTable[checkName] then
-          table.insert(Akkio_Consume_Helper_Settings.enabledBuffs, checkName)
-        end
-      end
-    end
-
-    DEFAULT_CHAT_FRAME:AddMessage("|cff00FF00Akkio Consume Helper:|r Buff selections saved successfully!")
-    -- Force immediate refresh of buff status UI to show new selections
-    ForceRefreshBuffStatus()
-  end)
-
   local totalHeight = currentYOffset + 20
   content:SetHeight(totalHeight)
 
@@ -1639,13 +1670,17 @@ BuildBuffStatusUI = function()
       slot = "offhand"
     end
     
-    -- Find the full buff data from allBuffs
-    for _, buff in ipairs(allBuffs) do
-      if buff.name == actualName then
-        -- For weapon enchants, only add if slot matches or if it's not a weapon enchant
-        if not buff.isWeaponEnchant or buff.slot == slot then
-          table.insert(enabledBuffsList, buff)
-          break
+    -- Skip items marked as "only for shopping list" (not shown in status bar)
+    local ofs = Akkio_Consume_Helper_Settings.onlyForShopping
+    if not (ofs and ofs[name]) then
+      -- Find the full buff data from allBuffs
+      for _, buff in ipairs(allBuffs) do
+        if buff.name == actualName then
+          -- For weapon enchants, only add if slot matches or if it's not a weapon enchant
+          if not buff.isWeaponEnchant or buff.slot == slot then
+            table.insert(enabledBuffsList, buff)
+            break
+          end
         end
       end
     end
@@ -1688,6 +1723,7 @@ BuildBuffStatusUI = function()
     ["Alcoholic Beverages"]            = "Food",
     ["Resistance Potions"]             = "Combat",
     ["Combat Potions"]                 = "Combat",
+    ["Utility"]                        = "Combat",
   }
   local function getMetaCat(buff)
     local cat = buffCategoryMap[buff]
@@ -2387,7 +2423,7 @@ CreateMinimapButton = function()
   UpdateMinimapButtonPosition()
 
   miniMapBtn:SetScript("OnClick", function()
-    BuildMainFrame(1)
+    BuildMainFrame()
   end)
 
   -- Tooltip for the minimap button

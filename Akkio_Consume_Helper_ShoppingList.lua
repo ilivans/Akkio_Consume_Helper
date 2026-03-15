@@ -13,8 +13,12 @@ local itemMats = {
   [13510] = {"30x Golden Sansam", "10x Stonescale Oil", "1x Black Lotus", "1x Crystal Vial"},
   [13512] = {"30x Dreamfoil", "10x Mountain Silversage", "1x Black Lotus", "1x Crystal Vial"},
   [13511] = {"30x Sungrass", "10x Icecap", "1x Black Lotus", "1x Crystal Vial"},
-  -- Elixirs & Concoctions
+  [13513] = {"30x Icecap", "10x Mountain Silversage", "1x Black Lotus", "1x Crystal Vial"},
+  [13506] = {"30x Stonescale Oil", "10x Mountain Silversage", "1x Black Lotus", "1x Crystal Vial"},
+  -- Elixirs
   [13452] = {"2x Mountain Silversage", "2x Plaguebloom", "1x Crystal Vial"},
+  [9187]  = {"1x Sungrass", "1x Goldthorn", "1x Crystal Vial"},
+  [13453] = {"2x Gromsblood", "2x Plaguebloom", "1x Crystal Vial"},
   [3825]  = {"1x Wild Steelbloom", "1x Goldthorn", "1x Leaded Vial"},
   [9206]  = {"1x Sungrass", "1x Gromsblood", "1x Crystal Vial"},
   [13445] = {"2x Stonescale Oil", "1x Sungrass", "1x Crystal Vial"},
@@ -27,11 +31,15 @@ local itemMats = {
   [55048] = {"3x Purple Lotus", "1x Crystal Vial"},
   [17708] = {"2x Wintersbite", "1x Khadgar's Whisker", "1x Leaded Vial"},
   [50237] = {"3x Heart of the Wild", "1x Golden Sansam", "1x Sungrass", "1x Crystal Vial"},
+  [3386]  = {"1x Large Venom Sac", "1x Bruiseweed", "1x Leaded Vial"},
+  [9224]  = {"1x Gromsblood", "1x Ghost Mushroom", "1x Crystal Vial"},
+  [22193] = {"Quest: More Components of Importance"},
   [47412] = {9206, 13454, "1x Imbued Vial"},
   [47414] = {12820, 61423, "1x Imbued Vial"},
   [47410] = {13452, 61224, "1x Imbued Vial"},
   -- Special Potions & Consumables
   [20079] = {"Quest: 1x Zandalar Honor Token"},
+  [20081] = {"Quest: 1x Zandalar Honor Token"},
   [20007] = {"1x Dreamfoil", "2x Plaguebloom", "1x Crystal Vial"},
   [20004] = {"1x Gromsblood", "2x Plaguebloom", "1x Crystal Vial"},
   [8412]  = {"Quest: 1x Blasted Boar Lung", "2x Vulture Gizzard", "3x Scorpok Pincer"},
@@ -40,26 +48,40 @@ local itemMats = {
   [9088]  = {"1x Arthas' Tears", "1x Blindweed", "1x Crystal Vial"},
   [61423] = {"Quest: 1x Small Dream Shard"},
   [12820] = {"Drops from Furbolgs in Winterspring"},
+  [10305] = {"Looted from various world NPC's"},
   -- Weapon Enchants
   [12404] = {"1x Dense Stone"},
+  [12643] = {"1x Dense Stone", "1x Runecloth"},
+  [12645] = {"4x Thorium Bar", "4x Dense Grinding Stone", "2x Essence of Earth"},
   [18262] = {"2x Elemental Earth", "3x Dense Stone"},
   [20748] = {"2x Large Brilliant Shard", "3x Purple Lotus", "1x Imbued Vial"},
   [20749] = {"2x Large Brilliant Shard", "3x Firebloom", "1x Imbued Vial"},
   [23123] = {"Quest: 8x Necrotic Rune"},
   [3829]  = {"4x Khadgar's Whisker", "2x Wintersbite", "1x Leaded Vial"},
   [23122] = {"Quest: 8x Necrotic Rune"},
+  -- Poisons
+  [8928]  = {"4x Dust of Deterioration", "1x Crystal Vial"},
+  [3776]  = {"3x Essence of Agony", "1x Crystal Vial"},
+  [20844] = {"7x Deathweed", "1x Crystal Vial"},
+  [9186]  = {"2x Dust of Deterioration", "2x Essence of Agony", "1x Crystal Vial"},
+  [10922] = {"2x Essence of Agony", "2x Deathweed", "1x Crystal Vial"},
   -- Juju
   [12460] = {"Quest: 3x Frostmaul E'ko (Kill Frostmaul Giants)"},
   [12451] = {"Quest: 3x Winterfall E'ko (Kill Furbolgs)"},
+  [12455] = {"Quest: 3x Shardtooth E'ko (Kill Bears)"},
+  [12457] = {"Quest: 3x Chillwind E'ko (Kill Frostsabers)"},
   [12450] = {"Quest: 3x Frostsaber E'ko (Kill Flying Chillwinds)"},
   -- Food & Drinks
   [20452] = {"1x Sandworm Meat", "1x Soothing Spices"},
   [13931] = {"1x Raw Nightfin Snapper", "1x Refreshing Spring Water"},
   [18254] = {"1x Runn Tum Tuber", "1x Soothing Spices"},
   [13933] = {"1x Darkclaw Lobster", "1x Refreshing Spring Water"},
+  [13935] = {"1x Raw Whitescale Salmon", "1x Soothing Spices"},
+  [12218] = {"1x Giant Egg", "2x Soothing Spices"},
   [21023] = {"1x Chimaerok Tenderloin", "1x Hot Spices", "1x Goblin Rocket Fuel", "1x Deeprock Salt"},
-  [53015] = {"1x Tender Crocolisk Meat", "1x Tiger Meat", "2x Mystery Meat", "1x Hot Spices", "1x Soothing Spices"},
+  [53015] = {"1x Tender Crocolisk Meat", "1x Tiger Meat", "2x Mystery Meat", "1x Hot Spices", "1x Soothing Spices", "1x Refreshing Spring Water"},
   [84040] = {"1x Raw Whitescale Salmon", "1x Soothing Spices", "1x Premium Chocolate", "1x Golden Sansam"},
+  [84041] = {"1x Red Wolf Meat", "1x White Spider Meat", "1x Refreshing Spring Water"},
   [51714] = {"Gardening: Mountain Berry Bush Seeds"},
   [51711] = {"Gardening: Mountain Berry Bush Seeds"},
   [60978] = {"1x Gargantuan Tel'Abim Banana", "1x Soothing Spices", "2x Golden Sansam"},
@@ -67,11 +89,15 @@ local itemMats = {
   [60977] = {"1x Gargantuan Tel'Abim Banana", "1x Soothing Spices", "1x Icecap"},
   [51717] = {"Gardening: Magic Mushroom Spores"},
   [51720] = {"Gardening: Magic Mushroom Spores"},
+  [21217] = {"1x Raw Greater Sagefish", "1x Hot Spices"},
+  [18045] = {"1x Tender Wolf Meat", "1x Soothing Spices"},
+  [83309] = {"1x Sungrass", "1x Savage Frond", "3x Sweet Mountain Berry", "1x Blackmouth Oil"},
   -- Alcoholic Beverages
   [21151] = {"Diverse vendors"},
   [61174] = {"Looted from wine barrels in Lower Karazhan Halls"},
   [61175] = {"Looted from wine barrels in Lower Karazhan Halls"},
   [18269] = {"Bought from Stomper Kreeg after a Dire Maul Tribute run"},
+  [18284] = {"Bought from Stomper Kreeg after a Dire Maul Tribute run"},
   -- Resistance Potions
   [13457] = {"1x Elemental Fire", "1x Firebloom", "1x Crystal Vial"},
   [13456] = {"1x Elemental Water", "1x Icecap", "1x Crystal Vial"},
@@ -79,11 +105,34 @@ local itemMats = {
   [13459] = {"1x Shadow Oil", "2x Arthas' Tears", "1x Crystal Vial"},
   [13461] = {"1x Dream Dust", "1x Dreamfoil", "1x Crystal Vial"},
   [13460] = {"1x Elemental Air", "1x Golden Sansam", "1x Crystal Vial"},
+  [9036]  = {"1x Khadgar's Whisker", "1x Purple Lotus", "1x Crystal Vial"},
+  [3384]  = {"3x Mage Royal", "1x Wild Steelbloom", "1x Empty Vial"},
   -- Combat Potions
   [61675] = {"Quest: 1x Small Dream Shard"},
   [61181] = {"1x Gromsblood", "2x Mountain Silversage", "1x Swiftness Potion"},
   [13442] = {"3x Gromsblood", "1x Crystal Vial"},
   [13455] = {"3x Stonescale Oil", "1x Thorium Ore", "1x Crystal Vial"},
+  -- Utility Items
+  [20008] = {"2x Icecap", "2x Mountain Silversage", "2x Heart of the Wild", "1x Crystal Vial"},
+  [3387]  = {"2x Blindweed", "1x Ghost Mushroom", "1x Crystal Vial"},
+  [5634]  = {"2x Blackmouth Oil", "1x Stranglekelp", "1x Leaded Vial"},
+  [61225] = {"1x Murloc Eye", "1x Dreamfoil", "1x Purple Lotus", "1x Crystal Vial"},
+  [9030]  = {"1x Elemental Earth", "1x Goldthorn", "1x Crystal Vial"},
+  [4390]  = {"1x Iron Bar", "1x Heavy Blasting Powder", "1x Silk Cloth"},
+  [15993] = {"1x Thorium Widget", "3x Thorium Bar", "3x Dense Blasting Powder", "3x Runecloth"},
+  [18641] = {"2x Dense Blasting Powder", "3x Runecloth"},
+  [10646] = {"1x Mageweave Cloth", "3x Solid Blasting Powder", "1x Unstable Trigger"},
+  [13462] = {"2x Icecap", "2x Plaguebloom", "1x Crystal Vial"},
+  [13444] = {"2x Dreamfoil", "2x Icecap", "1x Crystal Vial"},
+  [13446] = {"2x Golden Sansam", "1x Mountain Silversage", "1x Crystal Vial"},
+  [7676]  = {"1x Swiftthistle", "1x Refreshing Spring Water"},
+  [14530] = {"2x Runecloth"},
+  [13180] = {"Looted from Crates in Stratholme"},
+  [20520] = {"Looted from NPC's in Stratholme"},
+  [12662] = {"Looted from various world NPC's"},
+  [9172]  = {"1x Ghost Mushroom", "1x Sungrass", "1x Crystal Vial"},
+  [3823]  = {"1x Fadeleaf", "1x Wild Steelbloom", "1x Leaded Vial"},
+  [19814] = {"1x Mithril Casing", "1x Thorium Tube", "2x Thorium Widget", "1x Truesilver Bar", "2x Rugged Leather", "4x Runecloth"},
 }
 
 -- ============================================================================
@@ -169,8 +218,8 @@ end
 
 local function formatCount(bags, bank, mail)
   local s = tostring(bags)
-  if bank > 0 then s = s .. " +" .. bank end
-  if mail  > 0 then s = s .. " +" .. mail  end
+  if bank > 0 then s = s .. "+" .. bank end
+  if mail  > 0 then s = s .. "+" .. mail  end
   return s
 end
 
@@ -199,12 +248,31 @@ local editMode     = false
 
 function Akkio_Consume_Helper_Shopping.BuildTrackerUI(panel)
   trackerPanel = panel
+
+  -- Already built for this panel — just refresh
+  if panel.scrollChild then
+    Akkio_Consume_Helper_Shopping.RefreshTracker()
+    return
+  end
+
   trackerRows  = {}
   editMode     = false
 
   initTrackerSettings()
 
   local allBuffs = Akkio_Consume_Helper_Data and Akkio_Consume_Helper_Data.allBuffs or {}
+
+  -- ---- Scroll frame (created first so button can anchor to it) ----
+  local scrollFrame = CreateFrame("ScrollFrame", "AkkioTrackerScrollFrame", panel)
+  scrollFrame:SetPoint("TOPLEFT",     panel, "TOPLEFT",     0,  -32)
+  scrollFrame:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -20, 5)
+  scrollFrame:EnableMouseWheel(true)
+
+  -- mainFrame=620, panel=600, scrollFrame=580 — use explicit width so rowW is always correct
+  local scrollChild = CreateFrame("Frame", nil, scrollFrame)
+  scrollChild:SetWidth(580)
+  scrollChild:SetHeight(1)
+  scrollFrame:SetScrollChild(scrollChild)
 
   -- ---- Top bar ------------------------------------------------
   local searchBox = CreateFrame("EditBox", "AkkioTrackerSearch", panel, "InputBoxTemplate")
@@ -230,10 +298,13 @@ function Akkio_Consume_Helper_Shopping.BuildTrackerUI(panel)
     Akkio_Consume_Helper_Shopping.RefreshTracker()
   end)
 
+  -- Anchor button to scrollFrame so its right edge aligns with the counter column:
+  -- countLabel right = scrollFrame_right - 10  (row offset 5 + label gap 5)
+  -- scrollFrame top  = panel_top - 32, toolbar at panel_top - 5 → yOffset = 27
   local editBtn = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
   editBtn:SetWidth(110)
   editBtn:SetHeight(22)
-  editBtn:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -30, -5)
+  editBtn:SetPoint("TOPRIGHT", scrollFrame, "TOPRIGHT", -10, 27)
   editBtn:SetText("Edit threshold")
   editBtn:SetScript("OnClick", function()
     editMode = not editMode
@@ -241,29 +312,18 @@ function Akkio_Consume_Helper_Shopping.BuildTrackerUI(panel)
     Akkio_Consume_Helper_Shopping.RefreshTracker()
   end)
 
-  -- ---- Scroll frame -------------------------------------------
-  local scrollFrame = CreateFrame("ScrollFrame", "AkkioTrackerScrollFrame", panel)
-  scrollFrame:SetPoint("TOPLEFT",     panel, "TOPLEFT",     0,  -32)
-  scrollFrame:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -20, 5)
-  scrollFrame:EnableMouseWheel(true)
-
-  local scrollChild = CreateFrame("Frame", nil, scrollFrame)
-  scrollChild:SetWidth(scrollFrame:GetWidth() or 560)
-  scrollChild:SetHeight(1)
-  scrollFrame:SetScrollChild(scrollChild)
-
   local scrollBar = CreateFrame("Slider", "AkkioTrackerScrollBar", panel, "UIPanelScrollBarTemplate")
   scrollBar:SetPoint("TOPRIGHT",    panel, "TOPRIGHT",    -2, -32)
   scrollBar:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -2,  5)
   scrollBar:SetWidth(16)
-  scrollBar:SetMinMaxValues(0, 0)
-  scrollBar:SetValue(0)
   scrollBar:SetScript("OnValueChanged", function()
     scrollFrame:SetVerticalScroll(this:GetValue())
   end)
+  scrollBar:SetMinMaxValues(0, 0)
+  scrollBar:SetValue(0)
   scrollFrame:SetScript("OnMouseWheel", function()
     local cur = scrollFrame:GetVerticalScroll()
-    local max = scrollBar:GetMaxValue() and scrollBar:GetMaxValue() or 0
+    local max = scrollBar.maxScroll or 0
     local new = math.max(0, math.min(cur - arg1 * 20, max))
     scrollFrame:SetVerticalScroll(new)
     scrollBar:SetValue(new)
@@ -346,19 +406,9 @@ function Akkio_Consume_Helper_Shopping.RefreshTracker()
           iconTex:SetPoint("LEFT", row, "LEFT", 0, 0)
           iconTex:SetTexture(data.icon)
 
-          -- Item name label
-          local nameLabel = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-          nameLabel:SetPoint("LEFT", iconTex, "RIGHT", 4, 0)
-          nameLabel:SetWidth(220)
-          nameLabel:SetJustifyH("LEFT")
-          local displayName = data.name
-          if data.isWeaponEnchant then
-            displayName = data.name .. " (" .. (data.slot == "mainhand" and "MH" or "OH") .. ")"
-          end
-          nameLabel:SetText(displayName)
-
-          -- Count label — color logic:
-          --   bags >= thresh           → green
+          -- Count label created first so nameLabel can anchor to its left edge
+          -- Color logic:
+          --   bags >= thresh                 → green
           --   bags < thresh, total >= thresh → orange (bank/mail can cover it)
           --   bags < thresh, total < thresh  → red
           local countLabel = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -372,6 +422,17 @@ function Akkio_Consume_Helper_Shopping.RefreshTracker()
           else
             countLabel:SetTextColor(1, 0, 0)
           end
+
+          -- Name label anchored between icon and count — fills the available space
+          local nameLabel = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+          nameLabel:SetPoint("LEFT",  iconTex,    "RIGHT", 4,  0)
+          nameLabel:SetPoint("RIGHT", countLabel, "LEFT",  -8, 0)
+          nameLabel:SetJustifyH("LEFT")
+          local displayName = data.name
+          if data.isWeaponEnchant then
+            displayName = data.name .. " (" .. (data.slot == "mainhand" and "MH" or "OH") .. ")"
+          end
+          nameLabel:SetText(displayName)
 
           -- Edit mode: threshold editbox
           if editMode then
@@ -443,6 +504,7 @@ function Akkio_Consume_Helper_Shopping.RefreshTracker()
   local visibleH  = panel.scrollFrame and panel.scrollFrame:GetHeight() or 700
   local maxScroll = math.max(0, yOffset - visibleH)
   panel.scrollBar:SetMinMaxValues(0, maxScroll)
+  panel.scrollBar.maxScroll = maxScroll
   if maxScroll == 0 then
     panel.scrollBar:Hide()
   else
