@@ -2167,7 +2167,7 @@ BuildBuffStatusUI = function()
         local buffHex = CLASS_COLORS[buffdata.buffClass] or "FFFFFF"
 
         local function buildMsg(extra)
-          local msg = "Need |cff" .. buffHex .. buffName .. "|r"
+          local msg = "need |cff" .. buffHex .. buffName .. "|r"
           if extra then msg = msg .. " " .. extra end
           return msg
         end
