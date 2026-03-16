@@ -249,6 +249,14 @@ function Akkio_Consume_Helper_Shopping.Initialize()
   initTrackerSettings()
 end
 
+-- Called by ResetToDefaults so caches and flags are rebuilt against the fresh settings table.
+function Akkio_Consume_Helper_Shopping.ResetCaches()
+  trackerSettingsReady = false
+  itemNames  = nil
+  lowerNames = nil
+  initTrackerSettings()
+end
+
 -- ============================================================================
 -- TRACKER UI
 -- ============================================================================

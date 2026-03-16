@@ -52,6 +52,11 @@ local function ResetToDefaults()
     }
   }
 
+  -- Reset shopping list caches so they rebuild against the new empty settings table
+  if Akkio_Consume_Helper_Shopping and Akkio_Consume_Helper_Shopping.ResetCaches then
+    Akkio_Consume_Helper_Shopping.ResetCaches()
+  end
+
   DEFAULT_CHAT_FRAME:AddMessage("|cff00FF00Settings reset completed.|r Please reconfigure your buff selections.")
 end
 
@@ -530,11 +535,14 @@ local function checkWeaponEnchant(slot)
   return false
 end
 
-local function checkHasBuff(data)
+-- activeSet is optional: a pre-built {texture=true} table to avoid repeated UnitBuff scans.
+local function checkHasBuff(data, activeSet)
   if data.checkInventory then
     return findItemInBagAndGetAmount(data.name) > 0
   elseif data.isWeaponEnchant then
     return checkWeaponEnchant(data.slot)
+  elseif activeSet then
+    return (activeSet[data.buffIcon] or activeSet[data.raidbuffIcon]) and true or false
   else
     for i = 1, 40 do
       local buffTexture = UnitBuff("player", i)
@@ -1990,6 +1998,15 @@ BuildBuffStatusUI = function()
     iconSpacing = Akkio_Consume_Helper_Settings.settings.iconSpacing
   end
   
+  -- Pre-compute active buff textures once for the whole rebuild instead of
+  -- calling UnitBuff() 40 times per icon inside checkHasBuff.
+  local activeBuildSet = {}
+  for i = 1, 40 do
+    local tex = UnitBuff("player", i)
+    if not tex then break end
+    activeBuildSet[tex] = true
+  end
+
   local currentRow = 0
   local currentCol = 0
   local currentCat = nil
@@ -2012,7 +2029,7 @@ BuildBuffStatusUI = function()
       end
       currentCat = dataCat
     end
-    local hasBuff = checkHasBuff(data)
+    local hasBuff = checkHasBuff(data, activeBuildSet)
 
     -- Reuse a pooled icon frame if available, otherwise create a new one
     local isNewIcon = false
