@@ -199,6 +199,20 @@ end
 if not Akkio_Consume_Helper_Settings.onlyForShopping then
   Akkio_Consume_Helper_Settings.onlyForShopping = {}
 end
+-- Seed default "only for shopping" = true for all Utility items, once at load
+do
+  local ofs = Akkio_Consume_Helper_Settings.onlyForShopping
+  local currentCat = nil
+  for _, buff in ipairs(Akkio_Consume_Helper_Data.allBuffs) do
+    if buff.header then
+      currentCat = buff.name
+    elseif currentCat == "Utility" and not buff.header then
+      local key = buff.name
+      if buff.isWeaponEnchant then key = buff.name .. "_" .. buff.slot end
+      if ofs[key] == nil then ofs[key] = true end
+    end
+  end
+end
 
 -- ============================================================================
 -- GLOBAL VARIABLES
@@ -213,8 +227,7 @@ local CLASS_COLORS = {
   ROGUE    = "FFF569", PRIEST   = "FFFFFF", SHAMAN   = "0070DE",
   MAGE     = "69CCF0", WARLOCK  = "9482C9", DRUID    = "FF7D0A",
 }
-local _, PLAYER_CLASS   = UnitClass("player")
-local PLAYER_CLASS_NAME = UnitClass("player")
+local PLAYER_CLASS_NAME, PLAYER_CLASS = UnitClass("player")
 local PLAYER_CLASS_HEX  = CLASS_COLORS[PLAYER_CLASS] or "FFFFFF"
 
 -- Frame references
@@ -356,10 +369,20 @@ local BuildMainFrame
 local lastActiveTab = 1
 local BuildBuffStatusUI
 local CreateMinimapButton
+local iconPool = {}  -- pool of reusable Button frames for buff icons
 local BuildResetConfirmationUI
 
 -- Persistent main frame reference
 local mainFrame = nil
+
+-- Shared tooltip frame for item scanning (bags, bank, mail charge detection)
+local itemScanTooltip = nil
+local function getItemScanTooltip()
+  if not itemScanTooltip then
+    itemScanTooltip = CreateFrame("GameTooltip", "ItemDataScanTooltip", UIParent, "GameTooltipTemplate")
+  end
+  return itemScanTooltip
+end
 
 -- ============================================================================
 -- UTILITY FUNCTIONS
@@ -451,10 +474,7 @@ local function findItemInBagAndGetAmount(itemName)
 end
 
 local function findItemChargesInBag(itemName)
-  if not getglobal("ItemDataScanTooltip") then
-    CreateFrame("GameTooltip", "ItemDataScanTooltip", UIParent, "GameTooltipTemplate")
-  end
-  local scanTip = getglobal("ItemDataScanTooltip")
+  local scanTip = getItemScanTooltip()
 
   local totalCharges = 0
   for bag = 0, 4 do
@@ -1594,14 +1614,6 @@ BuildBuffSelectionUI = function(panel)
       -- "Only for shopping" inline checkbox — shown for Utility
       if currentCat == "Utility" then
         local capturedCheckName = checkName
-        -- Ensure table exists (may be nil if settings were reset)
-        if not Akkio_Consume_Helper_Settings.onlyForShopping then
-          Akkio_Consume_Helper_Settings.onlyForShopping = {}
-        end
-        -- Default to true (only for shopping) if not yet set
-        if Akkio_Consume_Helper_Settings.onlyForShopping[capturedCheckName] == nil then
-          Akkio_Consume_Helper_Settings.onlyForShopping[capturedCheckName] = true
-        end
 
         local shopCb = CreateFrame("CheckButton", nil, content, "UICheckButtonTemplate")
         shopCb:SetWidth(20)
@@ -1907,13 +1919,14 @@ BuildBuffStatusUI = function()
       if buffStatusFrame.title then buffStatusFrame.title:Show() end
     end
   else
-    -- Clean up old children
+    -- Return old icon frames to the pool instead of orphaning them
     if buffStatusFrame.children then
       for i = 1, table.getn(buffStatusFrame.children) do
-        local child = buffStatusFrame.children[i]
-        if child then
-          child:Hide()
-          child:SetParent(nil)
+        local icon = buffStatusFrame.children[i]
+        if icon then
+          icon:Hide()
+          if icon.nameLabel then icon.nameLabel:Hide() end
+          tinsert(iconPool, icon)
         end
       end
       wipeTable(buffStatusFrame.children)
@@ -2001,100 +2014,113 @@ BuildBuffStatusUI = function()
     end
     local hasBuff = checkHasBuff(data)
 
-    local icon = CreateFrame("Button", nil, buffStatusFrame, "UIPanelButtonTemplate")
-    icon:SetWidth(30)
-    icon:SetHeight(30)
-    icon:SetPoint("TOPLEFT", buffStatusFrame, "TOPLEFT", xOffset, yOffset)
-
-    local iconTexture = icon:CreateTexture(nil, "ARTWORK")
-    iconTexture:SetAllPoints()
-    iconTexture:SetTexture(data.icon)
-    if hasBuff then
-      iconTexture:SetVertexColor(1, 1, 1, 1)
+    -- Reuse a pooled icon frame if available, otherwise create a new one
+    local isNewIcon = false
+    local icon
+    if table.getn(iconPool) > 0 then
+      icon = table.remove(iconPool)
+      icon:SetParent(buffStatusFrame)
+      icon:ClearAllPoints()
+      icon:Show()
+      -- Hide optional sub-labels from previous use; they will be shown/updated below
+      if icon.timerLabel   then icon.timerLabel:Hide()   end
+      if icon.slotIndicator then icon.slotIndicator:Hide() end
     else
-      iconTexture:SetVertexColor(1, 0, 0, 1)
+      isNewIcon = true
+      icon = CreateFrame("Button", nil, buffStatusFrame, "UIPanelButtonTemplate")
+      icon:SetWidth(30)
+      icon:SetHeight(30)
+      icon:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square")
+
+      local iconTexture = icon:CreateTexture(nil, "ARTWORK")
+      iconTexture:SetAllPoints()
+      icon:SetNormalTexture(iconTexture)
+
+      local iconAmountLabel = icon:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+      iconAmountLabel:SetPoint("BOTTOM", icon, "BOTTOM", 10, 0)
+      icon.amountLabel = iconAmountLabel
     end
 
-    icon:SetNormalTexture(iconTexture)
-    icon:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square")
-
-    local iconAmountLabel = icon:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
-    iconAmountLabel:SetPoint("BOTTOM", icon, "BOTTOM", 10, 0)
-    
-    -- Show item amounts for all items; for weapon enchants show remaining charges
-    local itemAmount = data.isWeaponEnchant and findItemChargesInBag(data.name) or findItemInBagAndGetAmount(data.name)
-    iconAmountLabel:SetText(itemAmount > 0 and itemAmount or "")
-    
-    -- Store reference for fast updates
-    icon.amountLabel = iconAmountLabel
+    icon:SetPoint("TOPLEFT", buffStatusFrame, "TOPLEFT", xOffset, yOffset)
     icon.buffdata = data
 
-    -- Add timer label for normal buffs (not weapon enchants) and only if they have a duration
-    if not data.isWeaponEnchant and data.duration then
-      local timerLabel = icon:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-      timerLabel:SetPoint("TOP", icon, "TOP", 0, -8)
-      timerLabel:SetTextColor(1, 1, 1, 1) -- White text for visibility
-      
-      -- Show remaining time if buff is tracked
-      local remainingTime = getBuffRemainingTime(data.name)
-      timerLabel:SetText(formatTimeRemaining(remainingTime))
-      
-      -- Store reference for fast updates
-      icon.timerLabel = timerLabel
-    end
-
-    -- Add slot indicator and timer for weapon enchants
-    if data.isWeaponEnchant then
-      local slotIndicator = icon:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-      slotIndicator:SetPoint("TOP", icon, "TOP", 0, -2)
-      slotIndicator:SetText(data.slot == "mainhand" and "MH" or "OH")
-      slotIndicator:SetTextColor(1, 1, 0, 1) -- Yellow text for visibility
-      
-      -- Add timer label for weapon enchants using GetWeaponEnchantInfo
-      local timerLabel = icon:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-      timerLabel:SetPoint("BOTTOM", icon, "BOTTOM", 0, 8)
-      timerLabel:SetTextColor(1, 1, 1, 1) -- White text for visibility
-      
-      -- Get initial weapon enchant time
-      if data.slot == "mainhand" then
-        local hasMainHandEnchant, mainHandExpiration = GetWeaponEnchantInfo()
-        if hasMainHandEnchant and mainHandExpiration then
-          local remainingSeconds = mainHandExpiration / 1000 -- Convert milliseconds to seconds
-          timerLabel:SetText(formatTimeRemaining(remainingSeconds))
-        else
-          timerLabel:SetText("")
-        end
-      elseif data.slot == "offhand" then
-        local _, _, _, hasOffHandEnchant, offHandExpiration = GetWeaponEnchantInfo()
-        if hasOffHandEnchant and offHandExpiration then
-          local remainingSeconds = offHandExpiration / 1000 -- Convert milliseconds to seconds
-          timerLabel:SetText(formatTimeRemaining(remainingSeconds))
-        else
-          timerLabel:SetText("")
-        end
+    -- Update icon texture and tint
+    local nt = icon:GetNormalTexture()
+    if nt then
+      nt:SetTexture(data.icon)
+      if hasBuff then
+        nt:SetVertexColor(1, 1, 1, 1)
+      else
+        nt:SetVertexColor(1, 0, 0, 1)
       end
-      
-      -- Store reference for fast updates
-      icon.timerLabel = timerLabel
     end
 
-    local label = buffStatusFrame:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
-    label:SetPoint("LEFT", icon, "RIGHT", 5, 0)
-    
-    -- For weapon enchants, show the slot information
+    -- Update item amount
+    local itemAmount = data.isWeaponEnchant and findItemChargesInBag(data.name) or findItemInBagAndGetAmount(data.name)
+    icon.amountLabel:SetText(itemAmount > 0 and itemAmount or "")
+
+    -- Timer label for normal buffs with duration
+    if not data.isWeaponEnchant and data.duration then
+      if not icon.timerLabel then
+        local timerLabel = icon:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        timerLabel:SetPoint("TOP", icon, "TOP", 0, -8)
+        timerLabel:SetTextColor(1, 1, 1, 1)
+        icon.timerLabel = timerLabel
+      end
+      icon.timerLabel:Show()
+      icon.timerLabel:SetText(formatTimeRemaining(getBuffRemainingTime(data.name)))
+    end
+
+    -- Slot indicator and timer for weapon enchants
     if data.isWeaponEnchant then
-      local slotText = data.slot == "mainhand" and " (MH)" or " (OH)"
-      label:SetText(data.name .. slotText)
+      if not icon.slotIndicator then
+        local slotIndicator = icon:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        slotIndicator:SetPoint("TOP", icon, "TOP", 0, -2)
+        slotIndicator:SetTextColor(1, 1, 0, 1)
+        icon.slotIndicator = slotIndicator
+      end
+      icon.slotIndicator:Show()
+      icon.slotIndicator:SetText(data.slot == "mainhand" and "MH" or "OH")
+
+      if not icon.timerLabel then
+        local timerLabel = icon:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        timerLabel:SetPoint("BOTTOM", icon, "BOTTOM", 0, 8)
+        timerLabel:SetTextColor(1, 1, 1, 1)
+        icon.timerLabel = timerLabel
+      end
+      icon.timerLabel:Show()
+      if data.slot == "mainhand" then
+        local hasEnchant, expiration = GetWeaponEnchantInfo()
+        icon.timerLabel:SetText(hasEnchant and expiration and formatTimeRemaining(expiration / 1000) or "")
+      elseif data.slot == "offhand" then
+        local _, _, _, hasEnchant, expiration = GetWeaponEnchantInfo()
+        icon.timerLabel:SetText(hasEnchant and expiration and formatTimeRemaining(expiration / 1000) or "")
+      end
+    end
+
+    -- Name label anchored to icon (create once, reuse across rebuilds)
+    local label = icon.nameLabel
+    if not label then
+      label = buffStatusFrame:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+      label:SetPoint("LEFT", icon, "RIGHT", 5, 0)
+      icon.nameLabel = label
+    end
+
+    -- Update label text and color
+    if data.isWeaponEnchant then
+      label:SetText(data.name .. (data.slot == "mainhand" and " (MH)" or " (OH)"))
     else
       label:SetText(data.name)
     end
-    
     label:Hide()
     if hasBuff then
       label:SetTextColor(0, 1, 0)
     else
       label:SetTextColor(1, 0, 0)
     end
+
+    -- Scripts only need to be registered once (they use this.buffdata / icon.nameLabel)
+    if isNewIcon then
     icon:SetScript("OnClick", function()
       local buffName = label:GetText()
       local buffdata = this.buffdata
@@ -2301,9 +2327,10 @@ BuildBuffStatusUI = function()
       end
     end)
 
-    -- Save these to the children table for cleanup later
+    end -- if isNewIcon
+
+    -- Save icon to children table for cleanup/fast-update pass (label is on icon.nameLabel)
     table.insert(buffStatusFrame.children, icon)
-    table.insert(buffStatusFrame.children, label)
 
     -- Positioning logic for configurable icons per row
     currentCol = currentCol + 1
@@ -2974,10 +3001,7 @@ local function scanBankForTracker()
   if not store then return end
   store.bank = {}
 
-  if not getglobal("ItemDataScanTooltip") then
-    CreateFrame("GameTooltip", "ItemDataScanTooltip", UIParent, "GameTooltipTemplate")
-  end
-  local scanTip = getglobal("ItemDataScanTooltip")
+  local scanTip = getItemScanTooltip()
 
   for bag = -1, 10 do
     if bag == -1 or (bag >= 5 and bag <= 10) then
@@ -3028,10 +3052,7 @@ local function scanMailForTracker()
   if not store then return end
   store.mail = {}
 
-  if not getglobal("ItemDataScanTooltip") then
-    CreateFrame("GameTooltip", "ItemDataScanTooltip", UIParent, "GameTooltipTemplate")
-  end
-  local scanTip = getglobal("ItemDataScanTooltip")
+  local scanTip = getItemScanTooltip()
 
   local numItems = GetInboxNumItems()
   if numItems and numItems > 0 then
@@ -3088,9 +3109,30 @@ saveFrame:RegisterEvent("PLAYER_LOGOUT")
 saveFrame:RegisterEvent("ADDON_LOADED")
 saveFrame:RegisterEvent("BANKFRAME_OPENED")
 saveFrame:RegisterEvent("BANKFRAME_CLOSED")
+saveFrame:RegisterEvent("PLAYERBANKSLOTS_CHANGED")
+saveFrame:RegisterEvent("PLAYERBANKBAGSLOTS_CHANGED")
 saveFrame:RegisterEvent("MAIL_SHOW")
 saveFrame:RegisterEvent("MAIL_CLOSED")
 saveFrame:RegisterEvent("MAIL_INBOX_UPDATE")
+saveFrame:RegisterEvent("BAG_UPDATE")
+
+-- Debounce frame: coalesces rapid BAG_UPDATE events into a single shopping list refresh
+local bagUpdateDebounce = CreateFrame("Frame")
+bagUpdateDebounce:Hide()
+bagUpdateDebounce.delay = 0
+bagUpdateDebounce:SetScript("OnUpdate", function()
+  if GetTime() >= this.delay then
+    this:Hide()
+    if buffStatusFrame and buffStatusFrame.bagCache then
+      wipeTable(buffStatusFrame.bagCache)
+      buffStatusFrame.bagCacheTime = 0
+    end
+    if Akkio_Consume_Helper_Shopping and Akkio_Consume_Helper_Shopping.RefreshTracker then
+      Akkio_Consume_Helper_Shopping.RefreshTracker()
+    end
+  end
+end)
+
 saveFrame:SetScript("OnEvent", function()
   if event == "ADDON_LOADED" and arg1 == "Akkio_Consume_Helper" then
     -- Reinitialize buffTracker reference after addon loads
@@ -3114,6 +3156,11 @@ saveFrame:SetScript("OnEvent", function()
     bankDelayFrame:Show()
   elseif event == "BANKFRAME_CLOSED" then
     isBankOpen = false
+  elseif event == "PLAYERBANKSLOTS_CHANGED" or event == "PLAYERBANKBAGSLOTS_CHANGED" then
+    if isBankOpen then
+      bankDelayStart = GetTime()
+      bankDelayFrame:Show()
+    end
   elseif event == "MAIL_SHOW" then
     isMailOpen = true
     mailDelayStart = GetTime()
@@ -3125,5 +3172,15 @@ saveFrame:SetScript("OnEvent", function()
       mailDelayStart = GetTime()
       mailDelayFrame:Show()
     end
+  elseif event == "BAG_UPDATE" then
+    -- BAG_UPDATE fires reliably for both deposits and withdrawals.
+    -- When bank is open, also schedule a bank rescan (0.5s) and delay the
+    -- bag refresh (0.6s) so the bank data is updated before the display refreshes.
+    if isBankOpen then
+      bankDelayStart = GetTime()
+      bankDelayFrame:Show()
+    end
+    bagUpdateDebounce.delay = GetTime() + (isBankOpen and 0.6 or 0.3)
+    bagUpdateDebounce:Show()
   end
 end)

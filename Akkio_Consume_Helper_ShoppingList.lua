@@ -139,18 +139,26 @@ local itemMats = {
 -- ITEM NAME LOOKUP (built lazily from allBuffs)
 -- ============================================================================
 
-local itemNames = nil  -- itemID -> name
+local itemNames  = nil  -- itemID  -> name
+local lowerNames = nil  -- name    -> name:lower() (pre-cached for filter)
 
-local function getItemName(itemID)
-  if not itemNames then
-    itemNames = {}
-    local allBuffs = Akkio_Consume_Helper_Data and Akkio_Consume_Helper_Data.allBuffs or {}
-    for _, data in ipairs(allBuffs) do
-      if not data.header and data.itemID and data.name then
+local function ensureNameCaches()
+  if itemNames then return end
+  itemNames  = {}
+  lowerNames = {}
+  local allBuffs = Akkio_Consume_Helper_Data and Akkio_Consume_Helper_Data.allBuffs or {}
+  for _, data in ipairs(allBuffs) do
+    if not data.header and data.name then
+      lowerNames[data.name] = string.lower(data.name)
+      if data.itemID then
         itemNames[data.itemID] = data.name
       end
     end
   end
+end
+
+local function getItemName(itemID)
+  ensureNameCaches()
   return itemNames[itemID] or ("Item #" .. itemID)
 end
 
@@ -176,7 +184,9 @@ end
 -- HELPERS
 -- ============================================================================
 
+local trackerSettingsReady = false
 local function initTrackerSettings()
+  if trackerSettingsReady then return end
   if not Akkio_Consume_Helper_Settings.tracker then
     Akkio_Consume_Helper_Settings.tracker = {}
   end
@@ -184,6 +194,7 @@ local function initTrackerSettings()
   if not t.thresholds   then t.thresholds   = {} end
   if not t.bank         then t.bank         = {} end
   if not t.mail         then t.mail         = {} end
+  trackerSettingsReady = true
 end
 
 local function getThreshold(itemName)
@@ -243,7 +254,8 @@ end
 -- ============================================================================
 
 local trackerPanel = nil  -- reference to the panel frame
-local trackerRows  = {}   -- list of row frames for refresh
+local trackerRows  = {}   -- list of active row frames
+local rowPool      = {}   -- pool of reusable row frames (hidden, not attached to scrollChild)
 local editMode     = false
 
 function Akkio_Consume_Helper_Shopping.BuildTrackerUI(panel)
@@ -353,9 +365,10 @@ function Akkio_Consume_Helper_Shopping.RefreshTracker()
   local scrollChild = panel.scrollChild
   local allBuffs   = panel.allBuffs or {}
 
-  -- Destroy old rows
+  -- Return old rows to the pool instead of discarding them
   for _, row in ipairs(trackerRows) do
     row:Hide()
+    tinsert(rowPool, row)
   end
   trackerRows = {}
 
@@ -385,8 +398,9 @@ function Akkio_Consume_Helper_Shopping.RefreshTracker()
       end
 
       if enabledSet[key] then
-        -- Filter
-        local nameMatch = filterText == "" or string.find(string.lower(data.name), filterText)
+        -- Filter (use pre-cached lowercase name to avoid string.lower per item per keystroke)
+        ensureNameCaches()
+        local nameMatch = filterText == "" or string.find(lowerNames[data.name] or string.lower(data.name), filterText)
         if nameMatch then
           local bags   = getBagCount(data)
           local bank   = getBankCount(data.name)
@@ -394,57 +408,89 @@ function Akkio_Consume_Helper_Shopping.RefreshTracker()
           local thresh = getThreshold(data.name)
           local total  = bags + bank + mail
 
-          -- Row frame
-          local row = CreateFrame("Frame", nil, scrollChild)
+          -- Reuse a pooled row frame if available, otherwise create a new one
+          local row
+          if table.getn(rowPool) > 0 then
+            row = table.remove(rowPool)
+            row:SetParent(scrollChild)
+            row:Show()
+          else
+            row = CreateFrame("Frame", nil, scrollChild)
+            row:EnableMouse(true)
+
+            local iconTex = row:CreateTexture(nil, "ARTWORK")
+            iconTex:SetWidth(18)
+            iconTex:SetHeight(18)
+            iconTex:SetPoint("LEFT", row, "LEFT", 0, 0)
+            row.iconTex = iconTex
+
+            local nameLabel = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            nameLabel:SetJustifyH("LEFT")
+            row.nameLabel = nameLabel
+
+            local countLabel = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            countLabel:SetJustifyH("LEFT")
+            row.countLabel = countLabel
+
+            local tipFrame = CreateFrame("Frame", nil, row)
+            tipFrame:SetHeight(lineH)
+            tipFrame:SetPoint("LEFT", row, "LEFT", 0, 0)
+            tipFrame:EnableMouse(true)
+            row.tipFrame = tipFrame
+            row.tipFrame:SetScript("OnLeave", function()
+              GameTooltip:Hide()
+            end)
+          end
+
           row:SetWidth(rowW)
           row:SetHeight(lineH)
+          row:ClearAllPoints()
           row:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 5, -yOffset)
-          row:EnableMouse(true)
           table.insert(trackerRows, row)
 
-          -- Item icon
-          local iconTex = row:CreateTexture(nil, "ARTWORK")
-          iconTex:SetWidth(18)
-          iconTex:SetHeight(18)
-          iconTex:SetPoint("LEFT", row, "LEFT", 0, 0)
-          iconTex:SetTexture(data.icon)
+          -- Update icon texture
+          row.iconTex:SetTexture(data.icon)
 
-          -- Fixed column at 260px from row left: name clips there, counter aligns there
+          -- Fixed column: name clips before colX, counter starts at colX
           -- Color logic:
           --   bags >= thresh                 → green
           --   bags < thresh, total >= thresh → orange (bank/mail can cover it)
           --   bags < thresh, total < thresh  → red
           local colX = editMode and 200 or 260
 
-          local nameLabel = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-          nameLabel:SetPoint("LEFT",  row, "LEFT", 22, 0)
-          nameLabel:SetPoint("RIGHT", row, "LEFT", colX - 6, 0)
-          nameLabel:SetJustifyH("LEFT")
+          row.nameLabel:ClearAllPoints()
+          row.nameLabel:SetPoint("LEFT",  row, "LEFT", 22, 0)
+          row.nameLabel:SetPoint("RIGHT", row, "LEFT", colX - 6, 0)
 
-          local countLabel = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-          countLabel:SetPoint("LEFT", row, "LEFT", colX, 0)
-          countLabel:SetJustifyH("LEFT")
-          countLabel:SetText(formatCount(bags, bank, mail))
+          row.countLabel:ClearAllPoints()
+          row.countLabel:SetPoint("LEFT", row, "LEFT", colX, 0)
+          row.countLabel:SetText(formatCount(bags, bank, mail))
           if bags >= thresh then
-            countLabel:SetTextColor(0, 1, 0)
+            row.countLabel:SetTextColor(0, 1, 0)
           elseif total >= thresh then
-            countLabel:SetTextColor(1, 0.5, 0)
+            row.countLabel:SetTextColor(1, 0.5, 0)
           else
-            countLabel:SetTextColor(1, 0, 0)
+            row.countLabel:SetTextColor(1, 0, 0)
           end
+
           local displayName = data.name
           if data.isWeaponEnchant then
             displayName = data.name .. " (" .. (data.slot == "mainhand" and "MH" or "OH") .. ")"
           end
-          nameLabel:SetText(displayName)
+          row.nameLabel:SetText(displayName)
 
-          -- Edit mode: threshold editbox
+          -- Edit mode: threshold editbox (create once per row, reuse on subsequent refreshes)
           if editMode then
-            local threshBox = CreateFrame("EditBox", nil, row, "AkkioEditBoxTemplate")
-            threshBox:SetWidth(50)
-            threshBox:SetHeight(16)
-            threshBox:SetPoint("LEFT", countLabel, "RIGHT", 8, 0)
-            threshBox:SetMaxLetters(4)
+            local threshBox = row.threshBox
+            if not threshBox then
+              threshBox = CreateFrame("EditBox", nil, row, "AkkioEditBoxTemplate")
+              threshBox:SetWidth(50)
+              threshBox:SetHeight(16)
+              threshBox:SetPoint("LEFT", row.countLabel, "RIGHT", 8, 0)
+              threshBox:SetMaxLetters(4)
+              row.threshBox = threshBox
+            end
+            threshBox:Show()
             threshBox:SetText(tostring(thresh))
             local capturedName = data.name
             local function saveThresh()
@@ -467,51 +513,53 @@ function Akkio_Consume_Helper_Shopping.RefreshTracker()
               this:ClearFocus()
               this:SetText(tostring(getThreshold(capturedName)))
             end)
+          elseif row.threshBox then
+            row.threshBox:Hide()
           end
 
-          -- Tooltip on hover — narrow hit frame over icon + name only (same width as Select Buffs)
+          -- Tooltip: re-set OnEnter with fresh captured values each refresh
           local capturedData = data
-          local tipFrame = CreateFrame("Frame", nil, row)
+          local capturedBags = bags
+          local capturedBank = bank
+          local capturedMail = mail
+          local tipFrame = row.tipFrame
           tipFrame:SetWidth(220)
-          tipFrame:SetHeight(lineH)
-          tipFrame:SetPoint("LEFT", row, "LEFT", 0, 0)
-          tipFrame:EnableMouse(true)
           tipFrame:SetScript("OnEnter", function()
             if capturedData.itemID then
               GameTooltip:SetOwner(tipFrame, "ANCHOR_RIGHT")
               -- Try SetBagItem first so addons like aux can read the item context
+              -- Only scan bags if we know the item is there (capturedBags > 0)
               local foundInBag = false
-              for bag = 0, 4 do
-                for slot = 1, GetContainerNumSlots(bag) do
-                  local link = GetContainerItemLink(bag, slot)
-                  if link then
-                    local _, _, linkName = string.find(link, "%[(.-)%]")
-                    if linkName then
-                      linkName = string.gsub(linkName, " %(%d+%)$", "")
-                      if linkName == capturedData.name then
-                        GameTooltip:SetBagItem(bag, slot)
-                        foundInBag = true
-                        break
+              if capturedBags > 0 then
+                for bag = 0, 4 do
+                  for slot = 1, GetContainerNumSlots(bag) do
+                    local link = GetContainerItemLink(bag, slot)
+                    if link then
+                      local _, _, linkName = string.find(link, "%[(.-)%]")
+                      if linkName then
+                        linkName = string.gsub(linkName, " %(%d+%)$", "")
+                        if linkName == capturedData.name then
+                          GameTooltip:SetBagItem(bag, slot)
+                          foundInBag = true
+                          break
+                        end
                       end
                     end
                   end
+                  if foundInBag then break end
                 end
-                if foundInBag then break end
               end
               if not foundInBag then
                 GameTooltip:SetHyperlink("item:" .. capturedData.itemID)
               end
-              -- Inventory / bank / mail breakdown
-              local inv = getBagCount(capturedData)
-              local b   = getBankCount(capturedData.name)
-              local m   = getMailCount(capturedData.name)
+              -- Inventory / bank / mail breakdown (reuse already-computed counts)
               GameTooltip:AddLine(" ")
-              GameTooltip:AddLine("Inventory: " .. inv, 1, 1, 1, 1)
-              if b > 0 then
-                GameTooltip:AddLine("Bank: " .. b, 0.7, 0.7, 1, 1)
+              GameTooltip:AddLine("Inventory: " .. capturedBags, 1, 1, 1, 1)
+              if capturedBank > 0 then
+                GameTooltip:AddLine("Bank: " .. capturedBank, 0.7, 0.7, 1, 1)
               end
-              if m > 0 then
-                GameTooltip:AddLine("Mail: " .. m, 0.7, 1, 0.7, 1)
+              if capturedMail > 0 then
+                GameTooltip:AddLine("Mail: " .. capturedMail, 0.7, 1, 0.7, 1)
               end
               -- Ingredients / source
               local mats = itemMats[capturedData.itemID]
@@ -522,9 +570,6 @@ function Akkio_Consume_Helper_Shopping.RefreshTracker()
               end
               GameTooltip:Show()
             end
-          end)
-          tipFrame:SetScript("OnLeave", function()
-            GameTooltip:Hide()
           end)
 
           yOffset = yOffset + lineH
