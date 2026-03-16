@@ -298,13 +298,11 @@ function Akkio_Consume_Helper_Shopping.BuildTrackerUI(panel)
     Akkio_Consume_Helper_Shopping.RefreshTracker()
   end)
 
-  -- Anchor button to scrollFrame so its right edge aligns with the counter column:
-  -- countLabel right = scrollFrame_right - 10  (row offset 5 + label gap 5)
-  -- scrollFrame top  = panel_top - 32, toolbar at panel_top - 5 → yOffset = 27
+  -- Align button with the counter column (row offset 5 + colX 260 = 265 from panel left)
   local editBtn = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
   editBtn:SetWidth(110)
   editBtn:SetHeight(22)
-  editBtn:SetPoint("TOPRIGHT", scrollFrame, "TOPRIGHT", -10, 27)
+  editBtn:SetPoint("TOPLEFT", panel, "TOPLEFT", 265, -5)
   editBtn:SetText("Edit threshold")
   editBtn:SetScript("OnClick", function()
     editMode = not editMode
@@ -345,6 +343,11 @@ end
 
 function Akkio_Consume_Helper_Shopping.RefreshTracker()
   if not trackerPanel or not trackerPanel.scrollChild then return end
+
+  -- Always use fresh bag counts
+  if Akkio_Consume_Helper_Tracker and Akkio_Consume_Helper_Tracker.bustCache then
+    Akkio_Consume_Helper_Tracker.bustCache()
+  end
 
   local panel      = trackerPanel
   local scrollChild = panel.scrollChild
@@ -406,14 +409,21 @@ function Akkio_Consume_Helper_Shopping.RefreshTracker()
           iconTex:SetPoint("LEFT", row, "LEFT", 0, 0)
           iconTex:SetTexture(data.icon)
 
-          -- Count label created first so nameLabel can anchor to its left edge
+          -- Fixed column at 260px from row left: name clips there, counter aligns there
           -- Color logic:
           --   bags >= thresh                 → green
           --   bags < thresh, total >= thresh → orange (bank/mail can cover it)
           --   bags < thresh, total < thresh  → red
+          local colX = editMode and 200 or 260
+
+          local nameLabel = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+          nameLabel:SetPoint("LEFT",  row, "LEFT", 22, 0)
+          nameLabel:SetPoint("RIGHT", row, "LEFT", colX - 6, 0)
+          nameLabel:SetJustifyH("LEFT")
+
           local countLabel = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-          countLabel:SetPoint("RIGHT", row, "RIGHT", editMode and -60 or -5, 0)
-          countLabel:SetJustifyH("RIGHT")
+          countLabel:SetPoint("LEFT", row, "LEFT", colX, 0)
+          countLabel:SetJustifyH("LEFT")
           countLabel:SetText(formatCount(bags, bank, mail))
           if bags >= thresh then
             countLabel:SetTextColor(0, 1, 0)
@@ -422,12 +432,6 @@ function Akkio_Consume_Helper_Shopping.RefreshTracker()
           else
             countLabel:SetTextColor(1, 0, 0)
           end
-
-          -- Name label anchored between icon and count — fills the available space
-          local nameLabel = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-          nameLabel:SetPoint("LEFT",  iconTex,    "RIGHT", 4,  0)
-          nameLabel:SetPoint("RIGHT", countLabel, "LEFT",  -8, 0)
-          nameLabel:SetJustifyH("LEFT")
           local displayName = data.name
           if data.isWeaponEnchant then
             displayName = data.name .. " (" .. (data.slot == "mainhand" and "MH" or "OH") .. ")"
@@ -439,19 +443,25 @@ function Akkio_Consume_Helper_Shopping.RefreshTracker()
             local threshBox = CreateFrame("EditBox", nil, row, "AkkioEditBoxTemplate")
             threshBox:SetWidth(50)
             threshBox:SetHeight(16)
-            threshBox:SetPoint("RIGHT", row, "RIGHT", -5, 0)
+            threshBox:SetPoint("LEFT", countLabel, "RIGHT", 8, 0)
             threshBox:SetMaxLetters(4)
             threshBox:SetText(tostring(thresh))
             local capturedName = data.name
-            threshBox:SetScript("OnEnterPressed", function()
-              this:ClearFocus()
-              local v = tonumber(this:GetText())
+            local function saveThresh()
+              local v = tonumber(threshBox:GetText())
               if v and v >= 0 then
                 setThreshold(capturedName, v)
               else
-                this:SetText(tostring(getThreshold(capturedName)))
+                threshBox:SetText(tostring(getThreshold(capturedName)))
               end
+            end
+            threshBox:SetScript("OnEnterPressed", function()
+              this:ClearFocus()
+              saveThresh()
               Akkio_Consume_Helper_Shopping.RefreshTracker()
+            end)
+            threshBox:SetScript("OnEditFocusLost", function()
+              saveThresh()
             end)
             threshBox:SetScript("OnEscapePressed", function()
               this:ClearFocus()
@@ -459,12 +469,38 @@ function Akkio_Consume_Helper_Shopping.RefreshTracker()
             end)
           end
 
-          -- Tooltip on hover
+          -- Tooltip on hover — narrow hit frame over icon + name only (same width as Select Buffs)
           local capturedData = data
-          row:SetScript("OnEnter", function()
+          local tipFrame = CreateFrame("Frame", nil, row)
+          tipFrame:SetWidth(220)
+          tipFrame:SetHeight(lineH)
+          tipFrame:SetPoint("LEFT", row, "LEFT", 0, 0)
+          tipFrame:EnableMouse(true)
+          tipFrame:SetScript("OnEnter", function()
             if capturedData.itemID then
-              GameTooltip:SetOwner(this, "ANCHOR_CURSOR")
-              GameTooltip:SetHyperlink("item:" .. capturedData.itemID)
+              GameTooltip:SetOwner(tipFrame, "ANCHOR_RIGHT")
+              -- Try SetBagItem first so addons like aux can read the item context
+              local foundInBag = false
+              for bag = 0, 4 do
+                for slot = 1, GetContainerNumSlots(bag) do
+                  local link = GetContainerItemLink(bag, slot)
+                  if link then
+                    local _, _, linkName = string.find(link, "%[(.-)%]")
+                    if linkName then
+                      linkName = string.gsub(linkName, " %(%d+%)$", "")
+                      if linkName == capturedData.name then
+                        GameTooltip:SetBagItem(bag, slot)
+                        foundInBag = true
+                        break
+                      end
+                    end
+                  end
+                end
+                if foundInBag then break end
+              end
+              if not foundInBag then
+                GameTooltip:SetHyperlink("item:" .. capturedData.itemID)
+              end
               -- Inventory / bank / mail breakdown
               local inv = getBagCount(capturedData)
               local b   = getBankCount(capturedData.name)
@@ -487,7 +523,7 @@ function Akkio_Consume_Helper_Shopping.RefreshTracker()
               GameTooltip:Show()
             end
           end)
-          row:SetScript("OnLeave", function()
+          tipFrame:SetScript("OnLeave", function()
             GameTooltip:Hide()
           end)
 

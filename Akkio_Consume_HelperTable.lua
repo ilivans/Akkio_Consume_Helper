@@ -208,6 +208,15 @@ local enabledBuffs = {}
 local updateTimer = Akkio_Consume_Helper_Settings.settings.updateTimer
 local allBuffs = Akkio_Consume_Helper_Data.allBuffs
 
+local CLASS_COLORS = {
+  WARRIOR  = "C79C6E", PALADIN  = "F58CBA", HUNTER   = "ABD473",
+  ROGUE    = "FFF569", PRIEST   = "FFFFFF", SHAMAN   = "0070DE",
+  MAGE     = "69CCF0", WARLOCK  = "9482C9", DRUID    = "FF7D0A",
+}
+local _, PLAYER_CLASS   = UnitClass("player")
+local PLAYER_CLASS_NAME = UnitClass("player")
+local PLAYER_CLASS_HEX  = CLASS_COLORS[PLAYER_CLASS] or "FFFFFF"
+
 -- Frame references
 local buffSelectFrame = nil
 local settingsFrame = nil
@@ -634,6 +643,12 @@ end
 Akkio_Consume_Helper_Tracker = {
   getAmount  = findItemInBagAndGetAmount,
   getCharges = findItemChargesInBag,
+  bustCache  = function()
+    if buffStatusFrame and buffStatusFrame.bagCache then
+      wipeTable(buffStatusFrame.bagCache)
+      buffStatusFrame.bagCacheTime = 0
+    end
+  end,
 }
 
 local function ForceRefreshBuffStatus()
@@ -1441,7 +1456,7 @@ BuildBuffSelectionUI = function(panel)
 
       -- Create invisible frame over the icon for tooltip functionality
       local iconFrame = CreateFrame("Frame", nil, content)
-      iconFrame:SetWidth(20)
+      iconFrame:SetWidth(220)
       iconFrame:SetHeight(20)
       iconFrame:SetPoint("LEFT", cb, "RIGHT", 5, 0)
       iconFrame:EnableMouse(true)
@@ -1576,8 +1591,8 @@ BuildBuffSelectionUI = function(panel)
         label:SetText(actualBuffName)
       end
 
-      -- "Only for shopping" inline checkbox — shown for Combat Potions and Utility
-      if currentCat == "Combat Potions" or currentCat == "Utility" then
+      -- "Only for shopping" inline checkbox — shown for Utility
+      if currentCat == "Utility" then
         local capturedCheckName = checkName
         -- Ensure table exists (may be nil if settings were reset)
         if not Akkio_Consume_Helper_Settings.onlyForShopping then
@@ -1722,7 +1737,6 @@ BuildBuffStatusUI = function()
     ["Food & Drinks"]                  = "Food",
     ["Alcoholic Beverages"]            = "Food",
     ["Resistance Potions"]             = "Combat",
-    ["Combat Potions"]                 = "Combat",
     ["Utility"]                        = "Combat",
   }
   local function getMetaCat(buff)
@@ -2107,6 +2121,14 @@ BuildBuffStatusUI = function()
       if currentlyHasBuff then
         DEFAULT_CHAT_FRAME:AddMessage("|cff98FB98You already have " .. buffName .. " buff active.|r")
       else
+        local buffHex = CLASS_COLORS[buffdata.buffClass] or "FFFFFF"
+
+        local function buildMsg(extra)
+          local msg = "Need |cff" .. buffHex .. buffName .. "|r"
+          if extra then msg = msg .. " " .. extra end
+          return msg
+        end
+
         if GetNumRaidMembers() > 0 then
           local playerGroup = nil
           for i = 1, GetNumRaidMembers() do
@@ -2119,22 +2141,20 @@ BuildBuffStatusUI = function()
           if playerGroup and buffdata.canBeAnounced then
             local msg
             if buffdata.isPaladinBuff then
-              local playerClass = UnitClass("player")
-              msg = "|cffFF6B6Bneed " .. buffName .. " [" .. playerClass .. "]|r"
+              msg = buildMsg("[|cff" .. PLAYER_CLASS_HEX .. PLAYER_CLASS_NAME .. "|r]")
             elseif buffdata.isGroupBuff then
-              msg = "|cffFF6B6Bneed " .. buffName .. " [group " .. playerGroup .. "]|r"
+              msg = buildMsg("[group " .. playerGroup .. "]")
             else
-              msg = "|cffFF6B6Bneed " .. buffName .. "|r"
+              msg = buildMsg()
             end
             SendChatMessage(msg, "RAID")
           end
         elseif GetNumPartyMembers() > 0 and buffdata.canBeAnounced then
           local msg
           if buffdata.isPaladinBuff then
-            local playerClass = UnitClass("player")
-            msg = "|cffFF6B6Bneed " .. buffName .. " [" .. playerClass .. "]|r"
+            msg = buildMsg("[|cff" .. PLAYER_CLASS_HEX .. PLAYER_CLASS_NAME .. "|r]")
           else
-            msg = "|cffFF6B6Bneed " .. buffName .. "|r"
+            msg = buildMsg()
           end
           SendChatMessage(msg, "PARTY")
         end
