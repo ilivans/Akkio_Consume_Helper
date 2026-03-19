@@ -52,6 +52,11 @@ local function ResetToDefaults()
     }
   }
 
+  -- Re-initialise the buff tracker so the module-level local points at the
+  -- new settings table (not the one that was just discarded).
+  initializeBuffTracker()
+  buffTracker = Akkio_Consume_Helper_Settings.buffTracker
+
   -- Reset shopping list caches so they rebuild against the new empty settings table
   if Akkio_Consume_Helper_Shopping and Akkio_Consume_Helper_Shopping.ResetCaches then
     Akkio_Consume_Helper_Shopping.ResetCaches()
@@ -227,6 +232,51 @@ local enabledBuffs = {}
 local updateTimer = Akkio_Consume_Helper_Settings.settings.updateTimer
 local allBuffs = Akkio_Consume_Helper_Data.allBuffs
 
+-- ============================================================================
+-- STATIC LOOKUP TABLES (built once from allBuffs at load time)
+-- ============================================================================
+
+-- buffLookup[name][slot] = data  (slot is nil for non-weapon-enchants)
+-- Used by BuildBuffStatusUI to avoid O(n) allBuffs scans per enabled buff.
+local buffLookup = {}
+do
+  for _, buff in ipairs(allBuffs) do
+    if not buff.header and buff.name then
+      if not buffLookup[buff.name] then
+        buffLookup[buff.name] = {}
+      end
+      buffLookup[buff.name][buff.slot or "none"] = buff
+    end
+  end
+end
+
+-- buffCategoryMap[buff_ref] = category_name
+-- metaCategoryMap[category_name] = meta_category_name
+-- Both derived from static allBuffs; computed once instead of every rebuild.
+local buffCategoryMap = {}
+local metaCategoryMap = {
+  ["Class Buffs"]                    = "Buffs",
+  ["Flasks"]                         = "Elixirs",
+  ["Elixirs & Concoctions"]          = "Elixirs",
+  ["Juju"]                           = "Elixirs",
+  ["Special Potions & Consumables"]  = "Elixirs",
+  ["Weapon Enchants"]                = "Elixirs",
+  ["Food & Drinks"]                  = "Food",
+  ["Alcoholic Beverages"]            = "Food",
+  ["Resistance Potions"]             = "Combat",
+  ["Utility"]                        = "Combat",
+}
+do
+  local currentCategory = ""
+  for _, buff in ipairs(allBuffs) do
+    if buff.header then
+      currentCategory = buff.name
+    else
+      buffCategoryMap[buff] = currentCategory
+    end
+  end
+end
+
 local CLASS_COLORS = {
   WARRIOR  = "C79C6E", PALADIN  = "F58CBA", HUNTER   = "ABD473",
   ROGUE    = "FFF569", PRIEST   = "FFFFFF", SHAMAN   = "0070DE",
@@ -249,7 +299,6 @@ local resetConfirmFrame = nil
 local function initializeBuffTracker()
   if not Akkio_Consume_Helper_Settings.buffTracker then
     Akkio_Consume_Helper_Settings.buffTracker = {}
-    DEFAULT_CHAT_FRAME:AddMessage("|cffFFFF00Akkio Consume Helper:|r Initialized buff tracker in saved variables")
   end
 end
 
@@ -257,17 +306,20 @@ end
 initializeBuffTracker()
 local buffTracker = Akkio_Consume_Helper_Settings.buffTracker
 
--- Function to get buff duration from the data table
+-- Lazily-built buffIcon -> duration lookup (avoids O(n) scan on every tick)
+local buffDurationCache = nil
 local function getBuffDuration(buffTexture)
-  -- Look up duration in the allBuffs data table by matching buffIcon
-  for _, buff in ipairs(allBuffs) do
-    if not buff.header and buff.buffIcon == buffTexture and buff.duration then
-      return buff.duration
+  if not buffDurationCache then
+    buffDurationCache = {}
+    for _, buff in ipairs(allBuffs) do
+      if not buff.header and buff.buffIcon and buff.duration then
+        if not buffDurationCache[buff.buffIcon] then
+          buffDurationCache[buff.buffIcon] = buff.duration
+        end
+      end
     end
   end
-  
-  -- Default duration for unknown buffs (30 minutes = 1800 seconds)
-  return 1800
+  return buffDurationCache[buffTexture] or 1800
 end
 
 -- Function to update buff tracker for normal buffs
@@ -291,9 +343,6 @@ local function updateBuffTracker(buffName, buffTexture)
       lastSeen = now,
       icon = buffTexture
     }
-    
-    -- Explicitly save to ensure persistence
-    Akkio_Consume_Helper_Settings.buffTracker[buffName] = buffTracker[buffName]
   else
     -- Buff already being tracked and is still active
     local tracker = buffTracker[buffName]
@@ -314,45 +363,45 @@ local function updateBuffTracker(buffName, buffTexture)
       buffTracker[buffName].lastSeen = now
       buffTracker[buffName].icon = buffTexture
     end
-    
-    -- Explicitly save changes
-    Akkio_Consume_Helper_Settings.buffTracker[buffName] = buffTracker[buffName]
   end
 end
 
 -- Function to check if a tracked buff is still valid based on timestamp
 local function isBuffStillValid(buffName)
   if not buffTracker[buffName] then return false end
-  
+
   local tracker = buffTracker[buffName]
   local now = GetTime()
-  local elapsedTime = now - tracker.startTime
-  
-  return elapsedTime < tracker.duration
+
+  -- startTime > now means GetTime() reset (client restart). Treat as invalid so
+  -- the icon colour is driven by UnitBuff alone, not by a stale timestamp.
+  if tracker.startTime > now then return false end
+
+  return (now - tracker.startTime) < tracker.duration
 end
 
 -- Function to get remaining time for a buff
 local function getBuffRemainingTime(buffName)
   if not buffTracker[buffName] then return 0 end
-  
+
   local tracker = buffTracker[buffName]
   local now = GetTime()
+
+  -- startTime > now means GetTime() reset (client restart). We can't compute a
+  -- meaningful remaining time, so return 0 → formatTimeRemaining shows "" (empty).
+  -- Better to show nothing than a wildly wrong value.
+  if tracker.startTime > now then return 0 end
+
   local elapsedTime = now - tracker.startTime
   local remainingTime = tracker.duration - elapsedTime
-  
-  -- Drift detection: if the timer shows negative time (elapsed > duration),
-  -- this indicates timer drift even without buff reapplication
-  local driftThreshold = 60 -- 60 seconds tolerance for natural expiration
-  if remainingTime < -driftThreshold then
-    -- Significant negative time detected - timer has drifted
-    -- Clear the tracker since the buff should have expired long ago
+
+  -- Drift detection: large negative remaining means the timer drifted way past
+  -- the expected duration; clear it so we don't keep a zombie entry.
+  if remainingTime < -60 then
     buffTracker[buffName] = nil
-    if Akkio_Consume_Helper_Settings.buffTracker then
-      Akkio_Consume_Helper_Settings.buffTracker[buffName] = nil
-    end
     return 0
   end
-  
+
   return math.max(0, remainingTime)
 end
 
@@ -483,7 +532,7 @@ local function findItemChargesInBag(itemName)
 
   local totalCharges = 0
   for bag = 0, 4 do
-    for slot = 1, GetContainerNumSlots(bag) do
+    for slot = 1, (GetContainerNumSlots(bag) or 0) do
       local itemLink = GetContainerItemLink(bag, slot)
       if itemLink then
         local _, _, linkItemName = string.find(itemLink, "%[(.-)%]")
@@ -521,17 +570,9 @@ local function findItemChargesInBag(itemName)
 end
 
 local function checkWeaponEnchant(slot)
-  -- Check if a weapon enchant is present on the specified slot
-  -- Returns true if an enchant is detected, false otherwise
-  
-  if slot == "mainhand" then
-    local hasMainHandEnchant, _, _, hasOffHandEnchant, _, _ = GetWeaponEnchantInfo()
-    return hasMainHandEnchant
-  elseif slot == "offhand" then
-    local hasMainHandEnchant, _, _, hasOffHandEnchant, _, _ = GetWeaponEnchantInfo()
-    return hasOffHandEnchant
-  end
-  
+  local hasMH, _, _, hasOH = GetWeaponEnchantInfo()
+  if slot == "mainhand" then return hasMH end
+  if slot == "offhand"  then return hasOH  end
   return false
 end
 
@@ -567,57 +608,44 @@ local function UpdateBuffStatusOnly()
     return
   end
   
-  -- First pass: scan active buffs and update tracker for normal buffs
+  -- Build active buff set and cache weapon enchant state once for the whole pass
   local activeBuffs = {}
   for i = 1, 40 do
     local buffTexture = UnitBuff("player", i)
     if not buffTexture then break end
     activeBuffs[buffTexture] = true
   end
-  
+  local weMH, weMHExp, _, weOH, weOHExp = GetWeaponEnchantInfo()
+
   -- Only update existing icons instead of rebuilding entire UI
   for i = 1, table.getn(buffStatusFrame.children) do
     local icon = buffStatusFrame.children[i]
     if icon and icon.buffdata then
       local data = icon.buffdata
       local hasBuff = false
-      
+
       -- Check buff status efficiently
-      if data.checkInventory or data.isWeaponEnchant then
+      if data.checkInventory then
         hasBuff = checkHasBuff(data)
+      elseif data.isWeaponEnchant then
+        hasBuff = (data.slot == "mainhand" and weMH) or (data.slot == "offhand" and weOH)
       else
         -- Enhanced buff checking for normal buffs with timestamp tracking
-        local buffFound = false
-        for buffTexture, _ in pairs(activeBuffs) do
-          if buffTexture == data.buffIcon or buffTexture == data.raidbuffIcon then
-            buffFound = true
-            -- Update tracker when buff is found active (use data.name as consistent key)
-            updateBuffTracker(data.name, buffTexture)
-            break
-          end
+        local activeTexture = (activeBuffs[data.buffIcon] and data.buffIcon)
+                           or (activeBuffs[data.raidbuffIcon] and data.raidbuffIcon)
+        local buffFound = activeTexture ~= nil
+        if buffFound then
+          updateBuffTracker(data.name, activeTexture)
         end
         
-        -- If buff not currently active, check if still valid based on timestamp
         if buffFound then
           hasBuff = true
         else
-          -- Buff not found in active buffs - could be expired OR manually removed
-          if isBuffStillValid(data.name) then
-            -- Timestamp says it should still be active, but it's not found
-            -- This means it was manually removed - clear the tracker
-            if buffTracker and buffTracker[data.name] then
-              buffTracker[data.name] = nil
-              Akkio_Consume_Helper_Settings.buffTracker[data.name] = nil
-            end
-            hasBuff = false
-          else
-            -- Timestamp expired naturally - also clear the tracker
-            if buffTracker and buffTracker[data.name] then
-              buffTracker[data.name] = nil
-              Akkio_Consume_Helper_Settings.buffTracker[data.name] = nil
-            end
-            hasBuff = false
+          -- Buff gone from UnitBuff (expired or removed) — clear the tracker entry
+          if buffTracker and buffTracker[data.name] then
+            buffTracker[data.name] = nil
           end
+          hasBuff = false
         end
       end
       
@@ -637,24 +665,12 @@ local function UpdateBuffStatusOnly()
         icon.timerLabel:SetText(formatTimeRemaining(remainingTime))
       end
       
-      -- Update timer display for weapon enchants using GetWeaponEnchantInfo
+      -- Update timer display for weapon enchants (use cached GetWeaponEnchantInfo values)
       if data.isWeaponEnchant and icon.timerLabel then
         if data.slot == "mainhand" then
-          local hasMainHandEnchant, mainHandExpiration = GetWeaponEnchantInfo()
-          if hasMainHandEnchant and mainHandExpiration then
-            local remainingSeconds = mainHandExpiration / 1000 -- Convert milliseconds to seconds
-            icon.timerLabel:SetText(formatTimeRemaining(remainingSeconds))
-          else
-            icon.timerLabel:SetText("")
-          end
+          icon.timerLabel:SetText(weMH and weMHExp and formatTimeRemaining(weMHExp / 1000) or "")
         elseif data.slot == "offhand" then
-          local _, _, _, hasOffHandEnchant, offHandExpiration = GetWeaponEnchantInfo()
-          if hasOffHandEnchant and offHandExpiration then
-            local remainingSeconds = offHandExpiration / 1000 -- Convert milliseconds to seconds
-            icon.timerLabel:SetText(formatTimeRemaining(remainingSeconds))
-          else
-            icon.timerLabel:SetText("")
-          end
+          icon.timerLabel:SetText(weOH and weOHExp and formatTimeRemaining(weOHExp / 1000) or "")
         end
       end
       
@@ -697,9 +713,59 @@ local function ForceRefreshBuffStatus()
   end
 end
 
+-- Shared ticker handler: registered on buffStatusFrame.ticker by both BuildBuffStatusUI
+-- and OnLeavingCombat so the logic lives in exactly one place.
+local function buffTickerOnUpdate()
+  local now = GetTime()
+  local ticker = buffStatusFrame.ticker
+
+  -- Hover-to-show hide timer
+  if buffStatusFrame.hideTimer and now >= buffStatusFrame.hideTimer then
+    if Akkio_Consume_Helper_Settings.settings.hoverToShow then
+      buffStatusFrame.hoverCount = 0
+      buffStatusFrame:SetAlpha(0.0)
+    end
+    buffStatusFrame.hideTimer = nil
+  end
+
+  -- Periodic cleanup of expired buff tracker entries (every 30 seconds)
+  if (now - ticker.lastCleanup) > 30 then
+    if buffTracker and Akkio_Consume_Helper_Settings.buffTracker then
+      for buffName, tracker in pairs(buffTracker) do
+        if (now - tracker.startTime) >= tracker.duration then
+          local stillActive = false
+          for i = 1, 40 do
+            local tex = UnitBuff("player", i)
+            if not tex then break end
+            if tex == tracker.icon then stillActive = true; break end
+          end
+          if not stillActive then
+            buffTracker[buffName] = nil
+            Akkio_Consume_Helper_Settings.buffTracker[buffName] = nil
+          end
+        end
+      end
+    end
+    ticker.lastCleanup = now
+  end
+
+  if (now - ticker.lastUpdate) > updateTimer then
+    UpdateBuffStatusOnly()
+    ticker.lastUpdate = now
+
+    if (now - ticker.lastFullUpdate) > 10 then
+      if not Akkio_Consume_Helper_Settings.settings.hoverToShow or
+         (buffStatusFrame.hoverCount and buffStatusFrame.hoverCount > 0) then
+        BuildBuffStatusUI()
+      end
+      ticker.lastFullUpdate = now
+    end
+  end
+end
+
 local function findAndUseItemByName(itemName)
   for bag = 0, 4 do -- 0 = backpack, 1–4 = bags
-    for slot = 1, GetContainerNumSlots(bag) do
+    for slot = 1, (GetContainerNumSlots(bag) or 0) do
       local itemLink = GetContainerItemLink(bag, slot)
       if itemLink then
         -- Extract item name from link, handling items with charges
@@ -722,7 +788,7 @@ end
 local function applyWeaponEnchant(itemName, slot)
   -- Find the weapon enchant item in bags and put it on cursor for manual application
   for bag = 0, 4 do -- 0 = backpack, 1–4 = bags
-    for bagSlot = 1, GetContainerNumSlots(bag) do
+    for bagSlot = 1, (GetContainerNumSlots(bag) or 0) do
       local itemLink = GetContainerItemLink(bag, bagSlot)
       if itemLink then
         -- Extract item name from link, handling items with charges
@@ -1384,8 +1450,6 @@ BuildBuffSelectionUI = function(panel)
 
   local tempTable = {}
 
-  wipeTable(tempTable)
-
   for _, name in ipairs(Akkio_Consume_Helper_Settings.enabledBuffs) do
     -- Handle both old format (just name) and new format (name_slot for weapon enchants)
     local actualName = name
@@ -1501,7 +1565,7 @@ BuildBuffSelectionUI = function(panel)
         -- Method 1: Try to find the item in bags first (most reliable) - only for non-weapon enchants
         if not buffData.isWeaponEnchant then
           for bag = 0, 4 do
-            for slot = 1, GetContainerNumSlots(bag) do
+            for slot = 1, (GetContainerNumSlots(bag) or 0) do
               local itemLink = GetContainerItemLink(bag, slot)
               if itemLink then
                 local _, _, linkItemName = string.find(itemLink, "%[(.-)%]")
@@ -1708,14 +1772,12 @@ BuildBuffStatusUI = function()
     -- Skip items marked as "only for shopping list" (not shown in status bar)
     local ofs = Akkio_Consume_Helper_Settings.onlyForShopping
     if not (ofs and ofs[name]) then
-      -- Find the full buff data from allBuffs
-      for _, buff in ipairs(allBuffs) do
-        if buff.name == actualName then
-          -- For weapon enchants, only add if slot matches or if it's not a weapon enchant
-          if not buff.isWeaponEnchant or buff.slot == slot then
-            table.insert(enabledBuffsList, buff)
-            break
-          end
+      -- O(1) lookup via the module-level buffLookup table (replaces O(n) allBuffs scan)
+      local byName = buffLookup[actualName]
+      if byName then
+        local buff = byName[slot or "none"]
+        if buff then
+          table.insert(enabledBuffsList, buff)
         end
       end
     end
@@ -1735,33 +1797,10 @@ BuildBuffStatusUI = function()
   
   local splitByCategory = Akkio_Consume_Helper_Settings.settings.splitByCategory
 
-  -- Build a map from buff reference -> category name
-  local buffCategoryMap = {}
-  local currentCategory = ""
-  for _, buff in ipairs(allBuffs) do
-    if buff.header then
-      currentCategory = buff.name
-    else
-      buffCategoryMap[buff] = currentCategory
-    end
-  end
-
-  -- Meta-category groupings for split-by-category layout
-  local metaCategories = {
-    ["Class Buffs"]                    = "Buffs",
-    ["Flasks"]                         = "Elixirs",
-    ["Elixirs & Concoctions"]          = "Elixirs",
-    ["Juju"]                           = "Elixirs",
-    ["Special Potions & Consumables"]  = "Elixirs",
-    ["Weapon Enchants"]                = "Elixirs",
-    ["Food & Drinks"]                  = "Food",
-    ["Alcoholic Beverages"]            = "Food",
-    ["Resistance Potions"]             = "Combat",
-    ["Utility"]                        = "Combat",
-  }
+  -- getMetaCat uses the module-level buffCategoryMap/metaCategoryMap (built once at load)
   local function getMetaCat(buff)
     local cat = buffCategoryMap[buff]
-    return metaCategories[cat] or cat
+    return metaCategoryMap[cat] or cat
   end
 
   -- Count enabled icons per meta-category
@@ -2006,6 +2045,8 @@ BuildBuffStatusUI = function()
     if not tex then break end
     activeBuildSet[tex] = true
   end
+  -- Cache weapon enchant state once for the whole rebuild.
+  local weBuildMH, weBuildMHExp, _, weBuildOH, weBuildOHExp = GetWeaponEnchantInfo()
 
   local currentRow = 0
   local currentCol = 0
@@ -2029,7 +2070,12 @@ BuildBuffStatusUI = function()
       end
       currentCat = dataCat
     end
-    local hasBuff = checkHasBuff(data, activeBuildSet)
+    local hasBuff
+    if data.isWeaponEnchant then
+      hasBuff = (data.slot == "mainhand" and weBuildMH) or (data.slot == "offhand" and weBuildOH)
+    else
+      hasBuff = checkHasBuff(data, activeBuildSet)
+    end
 
     -- Reuse a pooled icon frame if available, otherwise create a new one
     local isNewIcon = false
@@ -2107,11 +2153,9 @@ BuildBuffStatusUI = function()
       end
       icon.timerLabel:Show()
       if data.slot == "mainhand" then
-        local hasEnchant, expiration = GetWeaponEnchantInfo()
-        icon.timerLabel:SetText(hasEnchant and expiration and formatTimeRemaining(expiration / 1000) or "")
+        icon.timerLabel:SetText(weBuildMH and weBuildMHExp and formatTimeRemaining(weBuildMHExp / 1000) or "")
       elseif data.slot == "offhand" then
-        local _, _, _, hasEnchant, expiration = GetWeaponEnchantInfo()
-        icon.timerLabel:SetText(hasEnchant and expiration and formatTimeRemaining(expiration / 1000) or "")
+        icon.timerLabel:SetText(weBuildOH and weBuildOHExp and formatTimeRemaining(weBuildOHExp / 1000) or "")
       end
     end
 
@@ -2367,63 +2411,7 @@ BuildBuffStatusUI = function()
     buffStatusFrame.ticker.lastUpdate = GetTime()
     buffStatusFrame.ticker.lastFullUpdate = GetTime()
     buffStatusFrame.ticker.lastCleanup = GetTime() -- Add cleanup timer
-    buffStatusFrame.ticker:SetScript("OnUpdate", function()
-      local now = GetTime()
-      
-      -- Check for delayed hide timer (for hover-to-show functionality)
-      if buffStatusFrame.hideTimer and now >= buffStatusFrame.hideTimer then
-        if Akkio_Consume_Helper_Settings.settings.hoverToShow then
-          -- Force hide if timer has expired, regardless of hoverCount state
-          -- This prevents the frame from getting stuck visible
-          buffStatusFrame.hoverCount = 0 -- Reset hover count
-          buffStatusFrame:SetAlpha(0.0) -- Hide the frame
-        end
-        buffStatusFrame.hideTimer = nil -- Clear the timer
-      end
-      
-      -- Periodic cleanup of expired buff tracker entries (every 30 seconds)
-      if (now - buffStatusFrame.ticker.lastCleanup) > 30 then
-        if buffTracker and Akkio_Consume_Helper_Settings.buffTracker then
-          for buffName, tracker in pairs(buffTracker) do
-            local elapsedTime = now - tracker.startTime
-            if elapsedTime >= tracker.duration then
-              -- Only remove if the buff is no longer active
-              local stillActive = false
-              for i = 1, 40 do
-                local tex = UnitBuff("player", i)
-                if not tex then break end
-                if tex == tracker.icon then
-                  stillActive = true
-                  break
-                end
-              end
-              if not stillActive then
-                buffTracker[buffName] = nil
-                Akkio_Consume_Helper_Settings.buffTracker[buffName] = nil
-              end
-            end
-          end
-        end
-        buffStatusFrame.ticker.lastCleanup = now
-      end
-      
-      if (now - buffStatusFrame.ticker.lastUpdate) > updateTimer then
-        -- Only do a quick update of buff status, not full UI rebuild
-        UpdateBuffStatusOnly()
-        this.lastUpdate = now
-        
-        -- Full UI rebuild only every 10 seconds or when settings change
-        -- BUT skip automatic rebuilds when hover-to-show is enabled to prevent unwanted visibility
-        if (now - this.lastFullUpdate) > 10 then
-          -- Only do automatic rebuilds if hover-to-show is disabled OR if someone is currently hovering
-          if not Akkio_Consume_Helper_Settings.settings.hoverToShow or 
-             (buffStatusFrame.hoverCount and buffStatusFrame.hoverCount > 0) then
-            BuildBuffStatusUI()
-          end
-          this.lastFullUpdate = now
-        end
-      end
-    end)
+    buffStatusFrame.ticker:SetScript("OnUpdate", buffTickerOnUpdate)
   end
 end
 
@@ -2831,7 +2819,7 @@ end
 local function OnAddonLoaded()
   -- Run migration first to ensure settings are compatible
   MigrateSettings()
-  
+
   -- Show welcome window for first-time users
   if not Akkio_Consume_Helper_Settings.hasSeenWelcome then
     local welcomeFrame = CreateWelcomeWindow()
@@ -2839,8 +2827,7 @@ local function OnAddonLoaded()
   end
   
   DEFAULT_CHAT_FRAME:AddMessage("|cff00FF00Akkio's Consume Helper|r |cffFFFF00v" .. ADDON_VERSION .. "|r loaded successfully!")
-  DEFAULT_CHAT_FRAME:AddMessage("|cffADD8E6Type|r |cffFFFF00/act|r |cffADD8E6to configure buffs|r")
-  DEFAULT_CHAT_FRAME:AddMessage("|cffADD8E6Type|r |cffFFFF00/actshopping|r |cffADD8E6to view shopping list|r")
+  DEFAULT_CHAT_FRAME:AddMessage("|cffADD8E6Type|r |cffFFFF00/act|r |cffADD8E6to open the addon|r")
   if not buffStatusFrame then
     -- No need to set rebuild flag here since frame doesn't exist yet
     BuildBuffStatusUI()
@@ -2854,55 +2841,38 @@ local function OnInCombat()
   
   -- Stop the buff status UI updates during combat (if enabled)
   if Akkio_Consume_Helper_Settings.settings.pauseUpdatesInCombat and buffStatusFrame and buffStatusFrame.ticker then
-    buffStatusFrame.ticker:SetScript("OnUpdate", nil)
-    
-    -- BUT keep essential functionality working by creating a minimal timer
-    -- This handles hover-to-show AND timer display updates during combat pause
+    -- Replace with a minimal handler: only hover-to-show timer and weapon enchant countdown
     buffStatusFrame.ticker:SetScript("OnUpdate", function()
       local now = GetTime()
-      
+
       -- Handle hover-to-show timer during combat pause
       if buffStatusFrame.hideTimer and now >= buffStatusFrame.hideTimer then
         if Akkio_Consume_Helper_Settings.settings.hoverToShow then
-          -- Force hide if timer has expired, regardless of hoverCount state
-          buffStatusFrame.hoverCount = 0 -- Reset hover count
-          buffStatusFrame:SetAlpha(0.0) -- Hide the frame
+          buffStatusFrame.hoverCount = 0
+          buffStatusFrame:SetAlpha(0.0)
         end
-        buffStatusFrame.hideTimer = nil -- Clear the timer
+        buffStatusFrame.hideTimer = nil
       end
-      
-      -- Update timer displays every second even during combat pause
-      -- This keeps consumable and weapon enchant timers visually accurate
+
+      -- Throttle timer updates to once per second
+      if (now - this.lastUpdate) < 1 then return end
+      this.lastUpdate = now
+
+      -- Cache weapon enchant state once for the whole pass
+      local weMH, weMHExp, _, weOH, weOHExp = GetWeaponEnchantInfo()
+
       if buffStatusFrame.children then
         for i = 1, table.getn(buffStatusFrame.children) do
           local icon = buffStatusFrame.children[i]
           if icon and icon.buffdata and icon.timerLabel then
             local data = icon.buffdata
-            
-            -- Update consumable timer displays
             if not data.isWeaponEnchant and data.duration then
-              local remainingTime = getBuffRemainingTime(data.name)
-              icon.timerLabel:SetText(formatTimeRemaining(remainingTime))
-            end
-            
-            -- Update weapon enchant timer displays
-            if data.isWeaponEnchant then
+              icon.timerLabel:SetText(formatTimeRemaining(getBuffRemainingTime(data.name)))
+            elseif data.isWeaponEnchant then
               if data.slot == "mainhand" then
-                local hasMainHandEnchant, mainHandExpiration = GetWeaponEnchantInfo()
-                if hasMainHandEnchant and mainHandExpiration then
-                  local remainingSeconds = mainHandExpiration / 1000
-                  icon.timerLabel:SetText(formatTimeRemaining(remainingSeconds))
-                else
-                  icon.timerLabel:SetText("")
-                end
+                icon.timerLabel:SetText(weMH and weMHExp and formatTimeRemaining(weMHExp / 1000) or "")
               elseif data.slot == "offhand" then
-                local _, _, _, hasOffHandEnchant, offHandExpiration = GetWeaponEnchantInfo()
-                if hasOffHandEnchant and offHandExpiration then
-                  local remainingSeconds = offHandExpiration / 1000
-                  icon.timerLabel:SetText(formatTimeRemaining(remainingSeconds))
-                else
-                  icon.timerLabel:SetText("")
-                end
+                icon.timerLabel:SetText(weOH and weOHExp and formatTimeRemaining(weOHExp / 1000) or "")
               end
             end
           end
@@ -2926,62 +2896,7 @@ local function OnLeavingCombat()
     buffStatusFrame.ticker.lastUpdate = GetTime() -- Reset the timer
     buffStatusFrame.ticker.lastFullUpdate = GetTime() -- Reset full update timer too
     buffStatusFrame.ticker.lastCleanup = GetTime() -- Reset cleanup timer too
-    buffStatusFrame.ticker:SetScript("OnUpdate", function()
-      local now = GetTime()
-      
-      -- CRITICAL: Include hover-to-show timer logic that was missing!
-      if buffStatusFrame.hideTimer and now >= buffStatusFrame.hideTimer then
-        if Akkio_Consume_Helper_Settings.settings.hoverToShow then
-          -- Force hide if timer has expired, regardless of hoverCount state
-          buffStatusFrame.hoverCount = 0 -- Reset hover count
-          buffStatusFrame:SetAlpha(0.0) -- Hide the frame
-        end
-        buffStatusFrame.hideTimer = nil -- Clear the timer
-      end
-      
-      -- Periodic cleanup of expired buff tracker entries (every 30 seconds)
-      if (now - buffStatusFrame.ticker.lastCleanup) > 30 then
-        if buffTracker and Akkio_Consume_Helper_Settings.buffTracker then
-          for buffName, tracker in pairs(buffTracker) do
-            local elapsedTime = now - tracker.startTime
-            if elapsedTime >= tracker.duration then
-              -- Only remove if the buff is no longer active
-              local stillActive = false
-              for i = 1, 40 do
-                local tex = UnitBuff("player", i)
-                if not tex then break end
-                if tex == tracker.icon then
-                  stillActive = true
-                  break
-                end
-              end
-              if not stillActive then
-                buffTracker[buffName] = nil
-                Akkio_Consume_Helper_Settings.buffTracker[buffName] = nil
-              end
-            end
-          end
-        end
-        buffStatusFrame.ticker.lastCleanup = now
-      end
-      
-      if (now - buffStatusFrame.ticker.lastUpdate) > updateTimer then
-        -- Only do a quick update of buff status, not full UI rebuild
-        UpdateBuffStatusOnly()
-        buffStatusFrame.ticker.lastUpdate = now
-        
-        -- Full UI rebuild only every 10 seconds or when settings change
-        -- BUT skip automatic rebuilds when hover-to-show is enabled to prevent unwanted visibility
-        if (now - buffStatusFrame.ticker.lastFullUpdate) > 10 then
-          -- Only do automatic rebuilds if hover-to-show is disabled OR if someone is currently hovering
-          if not Akkio_Consume_Helper_Settings.settings.hoverToShow or 
-             (buffStatusFrame.hoverCount and buffStatusFrame.hoverCount > 0) then
-            BuildBuffStatusUI()
-          end
-          buffStatusFrame.ticker.lastFullUpdate = now
-        end
-      end
-    end)
+    buffStatusFrame.ticker:SetScript("OnUpdate", buffTickerOnUpdate)
   end
   
   -- Show the buff status frame after combat (if it was hidden)
@@ -3122,7 +3037,6 @@ end)
 
 -- Ensure buff tracker data gets saved
 local saveFrame = CreateFrame("Frame")
-saveFrame:RegisterEvent("PLAYER_LOGOUT")
 saveFrame:RegisterEvent("ADDON_LOADED")
 saveFrame:RegisterEvent("BANKFRAME_OPENED")
 saveFrame:RegisterEvent("BANKFRAME_CLOSED")
@@ -3159,13 +3073,6 @@ saveFrame:SetScript("OnEvent", function()
     -- Initialize shopping list module if available
     if Akkio_Consume_Helper_Shopping and Akkio_Consume_Helper_Shopping.Initialize then
       Akkio_Consume_Helper_Shopping.Initialize()
-    end
-  elseif event == "PLAYER_LOGOUT" then
-    -- Force save buff tracker data on logout
-    if buffTracker then
-      for buffName, data in pairs(buffTracker) do
-        Akkio_Consume_Helper_Settings.buffTracker[buffName] = data
-      end
     end
   elseif event == "BANKFRAME_OPENED" then
     isBankOpen = true

@@ -364,11 +364,6 @@ end
 function Akkio_Consume_Helper_Shopping.RefreshTracker()
   if not trackerPanel or not trackerPanel.scrollChild then return end
 
-  -- Always use fresh bag counts
-  if Akkio_Consume_Helper_Tracker and Akkio_Consume_Helper_Tracker.bustCache then
-    Akkio_Consume_Helper_Tracker.bustCache()
-  end
-
   local panel      = trackerPanel
   local scrollChild = panel.scrollChild
   local allBuffs   = panel.allBuffs or {}
